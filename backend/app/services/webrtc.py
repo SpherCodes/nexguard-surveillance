@@ -1,5 +1,6 @@
 import asyncio
 import fractions
+import queue
 from aiortc import RTCPeerConnection, RTCSessionDescription, VideoStreamTrack, RTCIceCandidate, RTCConfiguration, RTCIceServer
 from av import VideoFrame
 import cv2
@@ -15,22 +16,49 @@ class CameraStreamTrack(VideoStreamTrack):
         self.camera_id = camera_id
         self.video_capture = video_capture
         self._frame_count = 0
+        self._cache_timeout = 2.0 
+        self._no_signal_interval = 5.0  # Show "No Signal" only every 5 seconds
+        self._last_no_signal_time = 0
         
     async def recv(self):
         """Get the next video frame"""
         frame_data = None
+        current_time = time.time()
         
         # Try to get frame from camera buffer
         if (self.camera_id in self.video_capture.frame_buffers and 
             not self.video_capture.frame_buffers[self.camera_id].empty()):
             try:
-                frame_data = self.video_capture.frame_buffers[self.camera_id].get_nowait()
-            except Exception:
-                pass
+                # frame_data = self.video_capture.frame_buffers[self.camera_id].get_nowait()
+                buffer = self.video_capture.frame_buffers[self.camera_id]
+                
+                frames_to_return = []
+                latest_frame = None
+                
+                for _ in range(min(buffer.qsize(), 10)):
+                    try:
+                        frame_data = buffer.get_nowait()
+                        frames_to_return.append(frame_data)
+                        latest_frame = frame_data
+                    except queue.Empty:
+                        break
+                
+                for frame in frames_to_return:
+                    try:
+                        buffer.put(frame, block=False)
+                    except queue.Full:
+                        pass
+                if latest_frame:
+                    frame_data = latest_frame
+            except Exception as e:
+                print(f"Error getting frame from buffer for camera {self.camera_id}: {e}")
+                frame_data = None
         
         if frame_data:
             # Extract the actual frame from frame_data
             frame = frame_data.frame if hasattr(frame_data, 'frame') else frame_data[0]
+            self._cached_frame = frame.copy()
+            self._last_frame_time = current_time
             
             # Convert BGR (OpenCV format) to RGB
             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -41,6 +69,23 @@ class CameraStreamTrack(VideoStreamTrack):
             video_frame.time_base = fractions.Fraction(1, 30)  # 30 fps
             
             self._frame_count += 1
+            return video_frame
+        elif self._cached_frame is not None and current_time - self._last_frame_time < self._cache_timeout:
+            frame = self._cached_frame
+            
+            # Convert BGR (OpenCV format) to RGB
+            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            
+            # Create video frame
+            video_frame = VideoFrame.from_ndarray(frame_rgb, format="rgb24")
+            video_frame.pts = self._frame_count
+            video_frame.time_base = fractions.Fraction(1, 30)
+            
+            self._frame_count += 1
+            
+            if current_time - self._last_frame_time > 0.5:
+                text = "buffering..."
+            
             return video_frame
         else:
             # Create a blank frame if no camera frame is available
@@ -84,7 +129,7 @@ class RTCSessionManager:
         self.tracks: Dict[str, Dict[str, CameraStreamTrack]] = {}
         
     async def create_answer(self, camera_id: str, peer_id: str, 
-                           offer_sdp: str, video_capture) -> str:
+                        offer_sdp: str, video_capture) -> str:
         """Create an answer for a WebRTC offer"""
         try:
             # Create peer connection with proper RTCConfiguration
