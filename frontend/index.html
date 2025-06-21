@@ -1,0 +1,74 @@
+from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
+from typing import List, Dict, Any
+from pydantic import BaseModel
+import json
+import asyncio
+
+from ...dependencies import get_video_capture
+from ...services.video_capture import CameraConfig, VideoCapture
+from ...services.webrtc import RTCSessionManager
+
+# Create a session manager to handle WebRTC connections
+rtc_manager = RTCSessionManager()
+
+# Add WebSocket endpoint for signaling
+@router.websocket("/{camera_id}/webrtc")
+async def webrtc_signaling(
+    websocket: WebSocket, 
+    camera_id: str,
+    video_capture: VideoCapture = Depends(get_video_capture)
+):
+    """WebRTC signaling for camera streaming"""
+    if camera_id not in video_capture.cameras:
+        await websocket.close(code=1008, reason=f"Camera {camera_id} not found")
+        return
+        
+    await websocket.accept()
+    
+    # Create a peer connection for this camera
+    peer_id = f"client_{websocket.client.host}_{websocket.client.port}"
+    
+    try:
+        # Make sure camera is running
+        if not video_capture.is_camera_running(camera_id):
+            video_capture._start_camera_thread(camera_id)
+        
+        # Handle signaling messages
+        while True:
+            # Receive message from client
+            data = await websocket.receive_text()
+            message = json.loads(data)
+            msg_type = message.get("type")
+            
+            if msg_type == "offer":
+                # Client sent an offer, create answer
+                session_desc = await rtc_manager.create_answer(
+                    camera_id, 
+                    peer_id, 
+                    message.get("sdp"),
+                    video_capture
+                )
+                await websocket.send_json({
+                    "type": "answer",
+                    "sdp": session_desc
+                })
+                
+            elif msg_type == "ice-candidate":
+                # Add ICE candidate
+                await rtc_manager.add_ice_candidate(
+                    camera_id,
+                    peer_id,
+                    message.get("candidate")
+                )
+                
+            elif msg_type == "disconnect":
+                # Client wants to disconnect
+                break
+                
+    except WebSocketDisconnect:
+        print(f"WebRTC client disconnected from camera {camera_id}")
+    except Exception as e:
+        print(f"WebRTC error for camera {camera_id}: {str(e)}")
+    finally:
+        # Clean up WebRTC resources
+        await rtc_manager.close_peer_connection(camera_id, peer_id)
