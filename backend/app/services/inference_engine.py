@@ -1,21 +1,22 @@
+import asyncio
 import threading
 import cv2
 import numpy as np
 import time
 from ultralytics import YOLO
-from typing import Dict, List, Optional, Tuple, Any
 import queue
 
 class YOLOProcessor:
     """Processes multiple camera streams using YOLOv11 for object detection."""
     
-    def __init__(self, model_path="yolo11n.pt",conf_threshold=0.5):
+    def __init__(self, model_path="yolo11n.pt",conf_threshold=0.5 , detection_manager=None):
         """
         Initialize the YOLO processor.
         
         Args:
             model_path (str): Path to the YOLO model weights.
             conf_threshold (float): Confidence threshold for detections.
+            detection_manager: Injected DetectionEventManager instance
         """
         self.model = YOLO(model_path)
         self.conf_threshold = conf_threshold
@@ -25,11 +26,15 @@ class YOLOProcessor:
         self.results_buffer = {}
         self.display_buffers = {}
         self.processing_stats = {}
-        self.display_windows = {}
+        
+        self.detection_manager = detection_manager 
 
     def connect_video_capture(self, video_capture):
         """Connect to an existing VideoCapture instance."""
         self.video_capture = video_capture
+        
+        if self.detection_manager:
+            self.detection_manager.video_capture = video_capture
     
     def start_processing(self,camera_ids=None):
         """
@@ -93,12 +98,6 @@ class YOLOProcessor:
                 del self.processing_threads[camera_id]
                 print(f"Stopped YOLO processing for camera {camera_id}")
         
-        # Close display windows
-        for camera_id in camera_ids:
-            if camera_id in self.display_windows and self.display_windows[camera_id]:
-                cv2.destroyWindow(f"YOLO: {camera_id}")
-                self.display_windows[camera_id] = False
-        
     def _process_camera_stream(self, camera_id: str):
         """
         Thread function to process frames from a camera with YOLO.
@@ -106,9 +105,7 @@ class YOLOProcessor:
         Args:
             camera_id (str): The camera ID to process.
         """
-        # Set up display window
-        self.display_windows[camera_id] = True
-        
+        print(f"starting processing for Camera: {camera_id}")
         last_frame_number = -1
         processing_start_time = time.time()
         frames_processed = 0
@@ -130,9 +127,11 @@ class YOLOProcessor:
             inference_start = time.time()
             results = self.model(frame_data.frame, conf=self.conf_threshold, verbose=False)
             inference_time = time.time() - inference_start
+            print(f"inference results: {results}")
             
             # Clear previous detections
             frame_data.detections = []
+            human_detected = False
             
             for result in results:
                 boxes = result.boxes.cpu().numpy()
@@ -144,42 +143,80 @@ class YOLOProcessor:
                         'name': result.names[int(box.cls[0])]
                     }
                     frame_data.detections.append(detection)
+                    
+                    if self.detection_manager:
+                        # Create async task for detection processing
+                        loop = None
+                        try:
+                            loop = asyncio.get_event_loop()
+                        except RuntimeError:
+                            # No event loop in this thread, create a new one
+                            loop = asyncio.new_event_loop()
+                            asyncio.set_event_loop(loop)
+                        
+                        # Process detection asynchronously
+                        if loop:
+                            asyncio.run_coroutine_threadsafe(
+                                self.detection_manager.process_detection(camera_id, frame_data, detection),
+                                loop
+                            )
+                    
+                    # Track human detection for UI
+                    if detection['name'].lower() == 'person':
+                        human_detected = True
+                    else:
+                        human_detected = False
             
             # Create annotated frame
             annotated_frame = frame_data.frame.copy()
             
             # Draw detections
-            for detection in frame_data.detections:
-                box = detection['box']
-                cls_name = detection['name']
-                conf = detection['conf']
+            # for detection in frame_data.detections:
+            #     box = detection['box']
+            #     cls_name = detection['name']
+            #     conf = detection['conf']
                 
-                text = f"{cls_name} {conf:.2f}"
-                (text_width, text_height), _ = cv2.getTextSize(
-                    text, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2
-                )
+            #     text = f"{cls_name} {conf:.2f}"
+            #     (text_width, text_height), _ = cv2.getTextSize(
+            #         text, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2
+            #     )
                 
-                # Draw box and label
-                cv2.rectangle(annotated_frame, (box[0], box[1]), (box[2], box[3]), (0, 255, 0), 2)
-                cv2.rectangle(
-                    annotated_frame,
-                    (box[0], box[1] - text_height - 10),
-                    (box[0] + text_width, box[1]),
-                    (0, 255, 0),
-                    -1
-                )
-                cv2.putText(annotated_frame, text, (box[0], box[1] - 5),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
+            #     # Draw box and label
+            #     cv2.rectangle(annotated_frame, (box[0], box[1]), (box[2], box[3]), (0, 255, 0), 2)
+            #     cv2.rectangle(
+            #         annotated_frame,
+            #         (box[0], box[1] - text_height - 10),
+            #         (box[0] + text_width, box[1]),
+            #         (0, 255, 0),
+            #         -1
+            #     )
+            #     cv2.putText(annotated_frame, text, (box[0], box[1] - 5),
+            #                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
             
             # Add stats overlay
             fps = frames_processed / (time.time() - processing_start_time)
+            
+            status_text = f"FPS: {fps:.1f} | Inference: {inference_time*1000:.1f}ms"
+            if human_detected:
+                status_text += " | 🚨 HUMAN DETECTED"
+                
             cv2.putText(
                 annotated_frame,
-                f"FPS: {fps:.1f} | Inference: {inference_time*1000:.1f}ms",
+                status_text,
                 (10, 30),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.7,
-                (0, 0, 255),
+                (0, 0, 255) if human_detected else (0, 255, 0),
+                2
+            )
+            
+            cv2.putText(
+                annotated_frame,
+                f"Camera: {camera_id}",
+                (10, 60),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.6,
+                (255, 255, 255),
                 2
             )
             
@@ -232,12 +269,3 @@ class YOLOProcessor:
                 pass
         
         return results[-1] if results else None
-    
-    def get_processing_stats(self):
-        """
-        Get processing statistics for all cameras.
-        
-        Returns:
-            Dict[str, Dict[str, Any]]: Stats for each camera.
-        """
-        return self.processing_stats

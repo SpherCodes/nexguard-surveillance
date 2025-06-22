@@ -4,59 +4,121 @@ import queue
 from aiortc import RTCPeerConnection, RTCSessionDescription, VideoStreamTrack, RTCIceCandidate, RTCConfiguration, RTCIceServer
 from av import VideoFrame
 import cv2
+from fastapi.params import Depends
 import numpy as np
 from typing import Dict, Optional
 import time
 
+from ..models.FrameData import FrameData
+
 class CameraStreamTrack(VideoStreamTrack):
-    """A video stream track that captures frames from VideoCapture"""
+    """A video stream track that captures frames from the inference engine"""
     
-    def __init__(self, camera_id, video_capture):
+    def __init__(self, camera_id, inference_engine, video_capture):
         super().__init__()
         self.camera_id = camera_id
+        self.inference_engine = inference_engine
         self.video_capture = video_capture
         self._frame_count = 0
         self._cache_timeout = 2.0 
-        self._no_signal_interval = 5.0  # Show "No Signal" only every 5 seconds
+        self._no_signal_interval = 5.0
         self._last_no_signal_time = 0
+        self._cached_frame = None
+        self._last_frame_time = 0
         
     async def recv(self):
-        """Get the next video frame"""
-        frame_data = None
+        """Get the next video frame from video capture with detection overlays"""
         current_time = time.time()
         
-        # Try to get frame from camera buffer
-        if (self.camera_id in self.video_capture.frame_buffers and 
-            not self.video_capture.frame_buffers[self.camera_id].empty()):
-            try:
-                # frame_data = self.video_capture.frame_buffers[self.camera_id].get_nowait()
-                buffer = self.video_capture.frame_buffers[self.camera_id]
-                
-                frames_to_return = []
-                latest_frame = None
-                
-                for _ in range(min(buffer.qsize(), 10)):
-                    try:
-                        frame_data = buffer.get_nowait()
-                        frames_to_return.append(frame_data)
-                        latest_frame = frame_data
-                    except queue.Empty:
-                        break
-                
-                for frame in frames_to_return:
-                    try:
-                        buffer.put(frame, block=False)
-                    except queue.Full:
-                        pass
-                if latest_frame:
-                    frame_data = latest_frame
-            except Exception as e:
-                print(f"Error getting frame from buffer for camera {self.camera_id}: {e}")
-                frame_data = None
+        # Get frame directly from video capture
+        frame_data = self.video_capture.get_latest_frame(self.camera_id)
         
-        if frame_data:
-            # Extract the actual frame from frame_data
-            frame = frame_data.frame if hasattr(frame_data, 'frame') else frame_data[0]
+        if frame_data and frame_data.frame is not None:
+            frame = frame_data.frame.copy()
+            
+            # Check for recent detections from inference engine
+            detection_data = None
+            if (self.camera_id in self.inference_engine.results_buffer and 
+                not self.inference_engine.results_buffer[self.camera_id].empty()):
+                try:
+                    buffer = self.inference_engine.results_buffer[self.camera_id]
+                    
+                    # Get the latest detection data
+                    latest_detection = None
+                    temp_items = []
+                    
+                    # Drain buffer to get latest detection
+                    for _ in range(min(buffer.qsize(), 10)):
+                        try:
+                            detection_item = buffer.get_nowait()
+                            temp_items.append(detection_item)
+                            latest_detection = detection_item
+                        except queue.Empty:
+                            break
+                    
+                    # Put items back
+                    for item in temp_items:
+                        try:
+                            buffer.put(item, block=False)
+                        except queue.Full:
+                            pass
+                    
+                    if latest_detection and hasattr(latest_detection, 'detections'):
+                        detection_data = latest_detection
+                        
+                except Exception as e:
+                    print(f"Error getting detection data for camera {self.camera_id}: {e}")
+            
+            # Add detection overlays if available
+            if detection_data and detection_data.detections:
+                human_detected = False
+                
+                # Draw detection boxes and labels
+                for detection in detection_data.detections:
+                    box = detection['box']
+                    cls_name = detection['name']
+                    conf = detection['conf']
+                    
+                    # Draw bounding box
+                    cv2.rectangle(frame, (box[0], box[1]), (box[2], box[3]), (0, 255, 0), 2)
+                    
+                    # Draw label with confidence
+                    text = f"{cls_name} {conf:.2f}"
+                    (text_width, text_height), _ = cv2.getTextSize(
+                        text, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2
+                    )
+                    
+                    # Background rectangle for text
+                    cv2.rectangle(
+                        frame,
+                        (box[0], box[1] - text_height - 10),
+                        (box[0] + text_width, box[1]),
+                        (0, 255, 0),
+                        -1
+                    )
+                    
+                    # Text
+                    cv2.putText(frame, text, (box[0], box[1] - 5),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
+                    
+                    if cls_name.lower() == 'person':
+                        human_detected = True
+                
+                # Add status overlay
+                status_text = f"Camera: {self.camera_id}"
+                if human_detected:
+                    status_text += " | 🚨 HUMAN DETECTED"
+                    cv2.putText(frame, status_text, (10, 30),
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+                else:
+                    cv2.putText(frame, status_text, (10, 30),
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+            else:
+                # No detections
+                cv2.putText(frame, f"Camera: {self.camera_id}", (10, 30),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+            
+            # Cache the frame
             self._cached_frame = frame.copy()
             self._last_frame_time = current_time
             
@@ -70,7 +132,9 @@ class CameraStreamTrack(VideoStreamTrack):
             
             self._frame_count += 1
             return video_frame
+            
         elif self._cached_frame is not None and current_time - self._last_frame_time < self._cache_timeout:
+            # Use cached frame
             frame = self._cached_frame
             
             # Convert BGR (OpenCV format) to RGB
@@ -82,10 +146,6 @@ class CameraStreamTrack(VideoStreamTrack):
             video_frame.time_base = fractions.Fraction(1, 30)
             
             self._frame_count += 1
-            
-            if current_time - self._last_frame_time > 0.5:
-                text = "buffering..."
-            
             return video_frame
         else:
             # Create a blank frame if no camera frame is available
@@ -128,55 +188,38 @@ class RTCSessionManager:
         self.peer_connections: Dict[str, Dict[str, RTCPeerConnection]] = {}
         self.tracks: Dict[str, Dict[str, CameraStreamTrack]] = {}
         
-    async def create_answer(self, camera_id: str, peer_id: str, 
-                        offer_sdp: str, video_capture) -> str:
-        """Create an answer for a WebRTC offer"""
+    async def create_answer(self, camera_id: str, peer_id: str,
+                            offer_sdp: str,
+                            inference_engine,
+                            video_capture) -> str:
+        """Create an answer for a WebRTC offer using processed frames"""
         try:
-            # Create peer connection with proper RTCConfiguration
             if camera_id not in self.peer_connections:
                 self.peer_connections[camera_id] = {}
                 self.tracks[camera_id] = {}
-            
-            # Create RTCConfiguration with proper RTCIceServer objects
             ice_servers = [RTCIceServer(urls=["stun:stun.l.google.com:19302"])]
             configuration = RTCConfiguration(iceServers=ice_servers)
-            
             pc = RTCPeerConnection(configuration=configuration)
             self.peer_connections[camera_id][peer_id] = pc
-            
-            # Create and add track
-            track = CameraStreamTrack(camera_id, video_capture)
+            # Use inference_engine for annotated frames
+            track = CameraStreamTrack(camera_id, inference_engine, video_capture)
             self.tracks[camera_id][peer_id] = track
             pc.addTrack(track)
-            
-            # Set up connection state handlers
             @pc.on("connectionstatechange")
             async def on_connectionstatechange():
-                print(f"Connection state for {camera_id}/{peer_id}: {pc.connectionState}")
                 if pc.connectionState == "failed":
                     await self.close_peer_connection(camera_id, peer_id)
-            
             @pc.on("iceconnectionstatechange")
             async def on_iceconnectionstatechange():
-                print(f"ICE connection state for {camera_id}/{peer_id}: {pc.iceConnectionState}")
                 if pc.iceConnectionState == "failed":
                     await self.close_peer_connection(camera_id, peer_id)
-            
-            # Set remote description
             offer = RTCSessionDescription(sdp=offer_sdp, type="offer")
             await pc.setRemoteDescription(offer)
-            
-            # Create answer
             answer = await pc.createAnswer()
             await pc.setLocalDescription(answer)
-            
-            print(f"Created answer for {camera_id}/{peer_id}")
             return pc.localDescription.sdp
-            
         except Exception as e:
             print(f"Error creating answer: {e}")
-            import traceback
-            traceback.print_exc()
             raise
     
     async def add_ice_candidate(self, camera_id: str, peer_id: str, candidate: RTCIceCandidate):

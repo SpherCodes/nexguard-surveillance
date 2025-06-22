@@ -3,8 +3,9 @@ from aiortc import RTCIceCandidate
 import json
 import asyncio
 
-from ...dependencies import get_video_capture
+from ...dependencies import get_inference_engine, get_video_capture
 from ...services.video_capture import VideoCapture
+from ...services.inference_engine import YOLOProcessor as inference_engine
 from ...services.webrtc import RTCSessionManager
 
 # Create a router instance
@@ -18,7 +19,8 @@ rtc_manager = RTCSessionManager()
 async def webrtc_signaling(
     websocket: WebSocket,
     camera_id: str,
-    video_capture: VideoCapture = Depends(get_video_capture)
+    video_capture: VideoCapture = Depends(get_video_capture),
+    inference_engine: inference_engine = Depends(get_inference_engine)
 ):
     """WebRTC signaling for camera streaming"""
     try:
@@ -35,6 +37,8 @@ async def webrtc_signaling(
         # Make sure camera is running
         if not video_capture.is_camera_running(camera_id):
             video_capture._start_camera_thread(camera_id)
+        if inference_engine:
+            inference_engine.start_processing(camera_id)
         
         # Handle signaling messages
         while True:
@@ -48,6 +52,7 @@ async def webrtc_signaling(
                     camera_id, 
                     peer_id, 
                     message.get("sdp"),
+                    inference_engine,
                     video_capture
                 )
                 await websocket.send_json({
