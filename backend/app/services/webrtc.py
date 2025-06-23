@@ -107,7 +107,7 @@ class CameraStreamTrack(VideoStreamTrack):
                 # Add status overlay
                 status_text = f"Camera: {self.camera_id}"
                 if human_detected:
-                    status_text += " | 🚨 HUMAN DETECTED"
+                    status_text += " |  HUMAN DETECTED"
                     cv2.putText(frame, status_text, (10, 30),
                                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
                 else:
@@ -128,7 +128,7 @@ class CameraStreamTrack(VideoStreamTrack):
             # Create video frame
             video_frame = VideoFrame.from_ndarray(frame_rgb, format="rgb24")
             video_frame.pts = self._frame_count
-            video_frame.time_base = fractions.Fraction(1, 30)  # 30 fps
+            video_frame.time_base = fractions.Fraction(1, 30)
             
             self._frame_count += 1
             return video_frame

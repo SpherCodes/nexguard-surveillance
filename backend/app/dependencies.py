@@ -17,12 +17,18 @@ def get_video_capture() -> VideoCapture:
 def get_inference_engine() -> InferenceEngine:
     global _inference_engine_instance
     if _inference_engine_instance is None:
+        # Get the detection event manager instance
+        detection_manager = get_detection_event_manager()
+        
         _inference_engine_instance = InferenceEngine(
             model_path=settings.DEFAULT_MODEL_PATH,
-            conf_threshold=settings.CONFIDENCE_THRESHOLD
+            conf_threshold=settings.CONFIDENCE_THRESHOLD,
+            detection_manager=detection_manager
         )
-    VideoCapture = get_video_capture()
-    _inference_engine_instance.connect_video_capture(VideoCapture)
+        
+        # Connect video capture
+        video_capture = get_video_capture()
+        _inference_engine_instance.connect_video_capture(video_capture)
     return _inference_engine_instance
 
 @lru_cache()

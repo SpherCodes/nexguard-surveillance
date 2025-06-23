@@ -8,28 +8,30 @@ from typing import Any, Dict, List, Optional, Tuple
 import cv2
 import numpy as np
 
+from ..models.FrameData import FrameData
+
 class DetectionEvent:
     """Represents a detection event"""
-    id: Optional[int] = None
-    camera_id: str = ""
-    timestamp: float = 0.0
-    detection_type: str = ""
-    confindence: float = 0.0
-    bounding_box: Optional[list[int]] = None
-    image_path: str = ""
-    video_clip_path: str = ""
-    notified: bool = False
     
-    def __post_init__(self):
-        """Post-initialization to ensure bounding_box is a list"""
-        if self.bounding_box is None:
-            self.bounding_box = []
+    def __init__(self, camera_id: str = "", timestamp: float = 0.0, detection_type: str = "", 
+                confindence: float = 0.0, bounding_box: Optional[List[int]] = None,
+                image_path: str = "", video_clip_path: str = "", notified: bool = False,
+                id: Optional[int] = None):
+        self.id = id
+        self.camera_id = camera_id
+        self.timestamp = timestamp
+        self.detection_type = detection_type
+        self.confindence = confindence
+        self.bounding_box = bounding_box if bounding_box is not None else []
+        self.image_path = image_path
+        self.video_clip_path = video_clip_path
+        self.notified = notified
             
 class DetectionEventManager:
     """Manages detection events"""
     
     def __init__(self, storage_path: str = ""):
-        self.storage_path = Path(storage_path)
+        self.storage_path = Path(storage_path) if storage_path else Path("")
         self.events = []
     
         self.images_path = self.storage_path / "detection_images"
@@ -52,13 +54,9 @@ class DetectionEventManager:
         self.video_capture = None
         self.inference_engine = None
         
-    def set_inference_engine(self, inference_engine):
-        """Set inference engine instance"""
-        self.inference_engine = inference_engine
-        print("Inference engine connected to detection manager")
         
     def should_record_detection(self, detection: Dict[str, Any]) -> bool:
-        """Determine if a detection should be recorded"""
+        """Records a detection event if it meets criteria"""
         detection_type = detection.get('name', '').lower()
         confidence = detection.get('conf', 0.0)
         
@@ -66,16 +64,12 @@ class DetectionEventManager:
         if confidence < self.min_confidence:
             return False
             
-        # Check if we should record this type
-        if self.record_all_detections:
-            return True
-            
         if self.record_human_detections and detection_type == 'person':
             return True
             
         return False
     
-    def record_detection(self, camera_id:str, frame_data, detection: Dict[str,Any]) -> DetectionEvent:
+    def record_detection(self, camera_id:str, frame_data:FrameData , detection: Dict[str,Any]) -> DetectionEvent:
         """Record a detection event"""
         if not self.should_record_detection(detection):
             return None
@@ -147,8 +141,7 @@ class DetectionEventManager:
                 'trigger_timestamp': trigger_timestamp,
                 'frames': [],
                 'output_path': self.videos_path / f"{camera_id}_{int(trigger_timestamp)}_detection.mp4"
-            }
-            
+            }            
             self.active_recordings[camera_id] = recording_info
             
             # Start recording thread
@@ -172,14 +165,14 @@ class DetectionEventManager:
             
             while time.time() < end_time:
                 if self.inference_engine:
-                    frame_data =  self.inference_engine.get_latest_results(camera_id)
+                    frame_data = self.inference_engine.get_latest_results(camera_id)
                 
                 if frame_data and frame_data.timestamp >= start_time:
                     frames_collected.append((frame_data.frame.copy(), frame_data.timestamp))
                 time.sleep(0.1)
                 
             if frames_collected:
-                self._save_video_Clip(
+                self._save_video_clip(
                     frames_collected,
                     recording_info['output_path']
                 )
@@ -191,7 +184,7 @@ class DetectionEventManager:
                 if camera_id in self.active_recordings:
                     del self.active_recordings[camera_id]
                     
-    def _save_video_clip(self, output_path: Path, frames:  List[Tuple[np.ndarray, float]]):
+    def _save_video_clip(self, frames: List[Tuple[np.ndarray, float]], output_path: Path):
         """Save collected frames as video clip"""
         if not frames:
             return

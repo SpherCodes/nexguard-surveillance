@@ -6,10 +6,12 @@ import time
 from ultralytics import YOLO
 import queue
 
+from .detection import DetectionEventManager
+
 class YOLOProcessor:
     """Processes multiple camera streams using YOLOv11 for object detection."""
     
-    def __init__(self, model_path="yolo11n.pt",conf_threshold=0.5 , detection_manager=None):
+    def __init__(self, model_path="yolo11n.pt", conf_threshold=0.5, detection_manager: DetectionEventManager = None):
         """
         Initialize the YOLO processor.
         
@@ -27,7 +29,7 @@ class YOLOProcessor:
         self.display_buffers = {}
         self.processing_stats = {}
         
-        self.detection_manager = detection_manager 
+        self.detection_manager = detection_manager
 
     def connect_video_capture(self, video_capture):
         """Connect to an existing VideoCapture instance."""
@@ -35,6 +37,7 @@ class YOLOProcessor:
         
         if self.detection_manager:
             self.detection_manager.video_capture = video_capture
+            self.detection_manager.inference_engine = self
     
     def start_processing(self,camera_ids=None):
         """
@@ -127,9 +130,7 @@ class YOLOProcessor:
             inference_start = time.time()
             results = self.model(frame_data.frame, conf=self.conf_threshold, verbose=False)
             inference_time = time.time() - inference_start
-            print(f"inference results: {results}")
-            
-            # Clear previous detections
+              # Clear previous detections
             frame_data.detections = []
             human_detected = False
             
@@ -144,28 +145,14 @@ class YOLOProcessor:
                     }
                     frame_data.detections.append(detection)
                     
+                    # Record detection synchronously
                     if self.detection_manager:
-                        # Create async task for detection processing
-                        loop = None
-                        try:
-                            loop = asyncio.get_event_loop()
-                        except RuntimeError:
-                            # No event loop in this thread, create a new one
-                            loop = asyncio.new_event_loop()
-                            asyncio.set_event_loop(loop)
-                        
-                        # Process detection asynchronously
-                        if loop:
-                            asyncio.run_coroutine_threadsafe(
-                                self.detection_manager.process_detection(camera_id, frame_data, detection),
-                                loop
-                            )
+                        self.detection_manager.record_detection(camera_id, frame_data, detection)
                     
                     # Track human detection for UI
                     if detection['name'].lower() == 'person':
                         human_detected = True
-                    else:
-                        human_detected = False
+                        print(f"Human detected in camera {camera_id}")
             
             # Create annotated frame
             annotated_frame = frame_data.frame.copy()
@@ -194,31 +181,31 @@ class YOLOProcessor:
             #                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
             
             # Add stats overlay
-            fps = frames_processed / (time.time() - processing_start_time)
+            # fps = frames_processed / (time.time() - processing_start_time)
             
-            status_text = f"FPS: {fps:.1f} | Inference: {inference_time*1000:.1f}ms"
-            if human_detected:
-                status_text += " | 🚨 HUMAN DETECTED"
+            # status_text = f"FPS: {fps:.1f} | Inference: {inference_time*1000:.1f}ms"
+            # if human_detected:
+            #     status_text += " | 🚨 HUMAN DETECTED"
                 
-            cv2.putText(
-                annotated_frame,
-                status_text,
-                (10, 30),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.7,
-                (0, 0, 255) if human_detected else (0, 255, 0),
-                2
-            )
+            # cv2.putText(
+            #     annotated_frame,
+            #     status_text,
+            #     (10, 30),
+            #     cv2.FONT_HERSHEY_SIMPLEX,
+            #     0.7,
+            #     (0, 0, 255) if human_detected else (0, 255, 0),
+            #     2
+            # )
             
-            cv2.putText(
-                annotated_frame,
-                f"Camera: {camera_id}",
-                (10, 60),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.6,
-                (255, 255, 255),
-                2
-            )
+            # cv2.putText(
+            #     annotated_frame,
+            #     f"Camera: {camera_id}",
+            #     (10, 60),
+            #     cv2.FONT_HERSHEY_SIMPLEX,
+            #     0.6,
+            #     (255, 255, 255),
+            #     2
+            # )
             
             # Store the annotated frame
             frame_data.annotated_frame = annotated_frame
