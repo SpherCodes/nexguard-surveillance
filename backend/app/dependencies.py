@@ -4,6 +4,7 @@ from .services.detection import DetectionEventManager
 from .services.video_capture import VideoCapture
 from .services.inference_engine import YOLOProcessor as InferenceEngine
 from .config import settings
+from .core.database import sessionLocal
 
 _video_capture_instance = None
 _inference_engine_instance = None
@@ -35,3 +36,11 @@ def get_inference_engine() -> InferenceEngine:
 def get_detection_event_manager() -> DetectionEventManager:
     """Single instance for all cameras"""
     return DetectionEventManager()
+
+def get_db():
+    """Dependency to get a database session"""
+    db = sessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()

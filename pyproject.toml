@@ -1,0 +1,347 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nexguard"
+version = "1.0.0"
+description = "AI-Powered Surveillance System with real-time object detection and WebRTC streaming"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "SpherCodes", email = "Sphersphiwe24@gmail.com"},
+]
+maintainers = [
+    {name = "NexGuard Team", email = "Sphersphiwe24@gmail.com"},
+]
+keywords = [
+    "surveillance", 
+    "ai", 
+    "object-detection", 
+    "yolo", 
+    "webrtc", 
+    "fastapi", 
+    "computer-vision"
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Security",
+    "Topic :: Multimedia :: Video",
+    "Framework :: FastAPI",
+]
+requires-python = ">=3.8"
+dependencies = [
+    # FastAPI and web framework
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+    "python-multipart>=0.0.6",
+    
+    # WebRTC and streaming
+    "aiortc>=1.6.0",
+    "av>=10.0.0",
+    
+    # Computer Vision and AI
+    "opencv-python>=4.8.0",
+    "ultralytics>=8.0.0",
+    "numpy>=1.24.0",
+    "pillow>=9.5.0",
+    
+    # Database
+    "sqlalchemy>=2.0.0",
+    "alembic>=1.12.0",
+    
+    # Async and utilities
+    "asyncio-mqtt>=0.13.0",
+    "python-dotenv>=1.0.0",
+    "pydantic>=2.4.0",
+    "pydantic-settings>=2.0.0",
+    
+    # Logging and monitoring
+    "loguru>=0.7.0",
+    
+    # HTTP client for external APIs
+    "httpx>=0.25.0",
+    "aiofiles>=23.2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    # Testing
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.1.0",
+    "httpx>=0.25.0",  # For testing FastAPI endpoints
+    
+    # Code quality
+    "black>=23.7.0",
+    "isort>=5.12.0",
+    "flake8>=6.0.0",
+    "mypy>=1.5.0",
+    "pre-commit>=3.4.0",
+    
+    # Documentation
+    "mkdocs>=1.5.0",
+    "mkdocs-material>=9.2.0",
+    "mkdocstrings[python]>=0.23.0",
+]
+production = [
+    # Production server
+    "gunicorn>=21.2.0",
+    
+    # Production database drivers
+    "psycopg2-binary>=2.9.7",  # PostgreSQL
+    "asyncpg>=0.28.0",         # Async PostgreSQL
+    
+    # Monitoring and logging
+    "prometheus-client>=0.17.0",
+    "sentry-sdk[fastapi]>=1.32.0",
+]
+gpu = [
+    # GPU accelerated versions
+    "torch>=2.0.0",
+    "torchvision>=0.15.0",
+    "ultralytics[gpu]>=8.0.0",
+]
+all = [
+    "nexguard[dev,production,gpu]",
+]
+
+[project.urls]
+Homepage = "https://github.com/nexguard/nexguard"
+Documentation = "https://nexguard.readthedocs.io"
+Repository = "https://github.com/nexguard/nexguard"
+Issues = "https://github.com/nexguard/nexguard/issues"
+Changelog = "https://github.com/nexguard/nexguard/releases"
+
+[project.scripts]
+nexguard = "backend.app.main:main"
+nexguard-server = "backend.scripts.run_server:main"
+nexguard-migrate = "backend.scripts.migrate:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["backend*", "scripts*"]
+exclude = ["tests*", "frontend*", "docs*"]
+
+[tool.setuptools.package-data]
+"backend.app" = ["alembic.ini"]
+"models" = ["*.pt", "*.onnx"]
+
+# Black configuration
+[tool.black]
+line-length = 88
+target-version = ['py38', 'py39', 'py310', 'py311']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+  | frontend
+  | node_modules
+)/
+'''
+
+# isort configuration
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+line_length = 88
+known_first_party = ["backend", "scripts"]
+known_third_party = ["fastapi", "sqlalchemy", "aiortc", "cv2", "ultralytics"]
+sections = ["FUTURE", "STDLIB", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
+
+# pytest configuration
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+    "--cov=backend",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+    "--cov-report=xml",
+]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+asyncio_mode = "auto"
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+    "unit: marks tests as unit tests",
+    "webrtc: marks tests that require WebRTC functionality",
+    "gpu: marks tests that require GPU",
+]
+
+# Coverage configuration
+[tool.coverage.run]
+source = ["backend"]
+omit = [
+    "*/tests/*",
+    "*/test_*",
+    "*/__pycache__/*",
+    "*/migrations/*",
+    "*/alembic/*",
+    "*/venv/*",
+    "*/.venv/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if __name__ == .__main__.:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]
+
+# MyPy configuration
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+
+[[tool.mypy.overrides]]
+module = [
+    "cv2.*",
+    "ultralytics.*",
+    "aiortc.*",
+    "av.*",
+]
+ignore_missing_imports = true
+
+# Flake8 configuration (via setup.cfg alternative)
+[tool.flake8]
+max-line-length = 88
+extend-ignore = ["E203", "W503", "E501"]
+exclude = [
+    ".git",
+    "__pycache__",
+    "build",
+    "dist",
+    ".venv",
+    ".eggs",
+    "*.egg",
+    "frontend",
+    "node_modules",
+]
+
+# Ruff configuration (alternative to flake8)
+[tool.ruff]
+line-length = 88
+target-version = "py38"
+select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "I",  # isort
+    "B",  # flake8-bugbear
+    "C4", # flake8-comprehensions
+    "UP", # pyupgrade
+]
+ignore = [
+    "E501",  # line too long, handled by black
+    "B008",  # do not perform function calls in argument defaults
+    "C901",  # too complex
+]
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".hg",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "venv",
+    "frontend",
+]
+
+[tool.ruff.per-file-ignores]
+"__init__.py" = ["F401"]
+
+# Environment variables and configuration
+[tool.nexguard]
+# Default configuration values
+default_model_path = "models/yolo11n.pt"
+default_confidence_threshold = 0.5
+default_detection_cooldown = 5.0
+default_storage_path = "data/storage"
+default_database_url = "sqlite:///data/nexguard.db"
+
+[tool.nexguard.detection]
+# Detection-specific configuration
+enabled_classes = [
+    "person", "car", "truck", "bus", "motorcycle", 
+    "bicycle", "dog", "cat", "bird"
+]
+confidence_thresholds = {person = 0.6, car = 0.5, truck = 0.5}
+cooldown_periods = {person = 3.0, vehicle = 5.0, animal = 10.0}
+
+[tool.nexguard.storage]
+# Storage configuration
+max_storage_size_gb = 10.0
+retention_days = 30
+cleanup_interval_hours = 24
+backup_enabled = true
+backup_schedule = "0 2 * * *"  # Daily at 2 AM
+
+[tool.nexguard.api]
+# API configuration
+cors_origins = ["http://localhost:3000", "http://localhost:4200"]
+rate_limit_requests = 100
+rate_limit_window = 60
+max_upload_size_mb = 50
+
+[tool.nexguard.webrtc]
+# WebRTC configuration
+ice_servers = [
+    {urls = "stun:stun.l.google.com:19302"},
+    {urls = "stun:stun1.l.google.com:19302"}
+]
+max_connections = 10
+connection_timeout = 30

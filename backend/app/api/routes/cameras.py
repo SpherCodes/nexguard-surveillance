@@ -1,8 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
 from typing import List
 from pydantic import BaseModel
+from requests import Session
 
-from ...dependencies import get_video_capture
+from ...core.database import Camera
+
+from ...dependencies import get_db, get_video_capture
 from ...services.video_capture import CameraConfig, VideoCapture as video_capture
 
 router = APIRouter()
@@ -38,9 +41,19 @@ async def list_cameras( video_capture: video_capture =  Depends(get_video_captur
     return cameras
 
 @router.post("/add")
-async def add_camera(camera_config: CameraConfigRequest, video_capture = Depends(get_video_capture)):
+async def add_camera(
+    camera_config: CameraConfigRequest, 
+    video_capture: video_capture = Depends(get_video_capture),
+    db: Session = Depends(get_db)
+):
     """Add a new camera to the system"""
     try:
+        # Check if camera already exists in DB
+        existing = db.query(Camera).filter(Camera.camera_id == camera_config.camera_id).first()
+        if existing:
+            raise HTTPException(status_code=400, detail=f"Camera {camera_config.camera_id} already exists")
+        
+        # Create runtime camera config
         config = CameraConfig(
             camera_id=camera_config.camera_id,
             url=camera_config.url,
@@ -49,7 +62,26 @@ async def add_camera(camera_config: CameraConfigRequest, video_capture = Depends
             buffer_size=camera_config.buffer_size,
             enabled=camera_config.enabled
         )
+        
+        # Add to video capture service
         video_capture.add_camera(config)
+        
+        # Add to database
+        db_camera = Camera(
+            camera_id=camera_config.camera_id,
+            url=camera_config.url,
+            name=camera_config.name,
+            location=camera_config.location,
+            fps_target=camera_config.fps_target,
+            resolution_width=camera_config.resolution[0],
+            resolution_height=camera_config.resolution[1],
+            buffer_size=camera_config.buffer_size,
+            enabled=camera_config.enabled
+        )
+        
+        db.add(db_camera)
+        db.commit()
+        
         return {"message": f"Camera {camera_config.camera_id} added successfully"}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

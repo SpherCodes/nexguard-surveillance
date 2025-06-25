@@ -18,9 +18,9 @@ class DetectionEvent:
     """Represents a detection event"""
     
     def __init__(self, camera_id: str = "", timestamp: float = 0.0, detection_type: str = "", 
-                confidence: float = 0.0, bounding_box: Optional[List[int]] = None,
-                image_path: str = "", video_clip_path: str = "", notified: bool = False,
-                id: Optional[int] = None):
+                 confidence: float = 0.0, bounding_box: Optional[List[int]] = None,
+                 image_path: str = "", video_clip_path: str = "", notified: bool = False,
+                 id: Optional[int] = None):
         self.id = id
         self.camera_id = camera_id
         self.timestamp = timestamp
@@ -30,9 +30,6 @@ class DetectionEvent:
         self.image_path = image_path
         self.video_clip_path = video_clip_path
         self.notified = notified
-        
-        
-        #cool down period for sanding notifications
             
 class DetectionEventManager:
     """Manages detection events"""
@@ -54,18 +51,13 @@ class DetectionEventManager:
         # Recording settings
         self.record_human_detections = True
         self.record_all_detections = False
-        self.min_confidence = 0.9
+        self.min_confidence = 0.5
         self.video_duration = 10
         self.cleanup_days = 30
         
         # Active video recordings
         self.active_recordings: Dict[str, Dict] = {}
         self.recording_lock = threading.Lock()
-        
-        # Cooldown period for saving detections (fixed naming)
-        self.detection_cooldown = 30  # seconds
-        self.last_detection_time: Dict[str, float] = {}  # Fixed type annotation
-        self.detection_cache_lock = threading.Lock()
         
         self.video_capture = None
         self.inference_engine = None
@@ -75,52 +67,23 @@ class DetectionEventManager:
         return sessionLocal()
     
     def should_record_detection(self, detection: Dict[str, Any]) -> bool:
-        """Check if detection meets criteria for recording"""
+        """Records a detection event if it meets criteria"""
         detection_type = detection.get('name', '').lower()
         confidence = detection.get('conf', 0.0)
         
         # Check confidence threshold
         if confidence < self.min_confidence:
             return False
-        
-        # Check if we should record this detection type
+            
         if self.record_human_detections and detection_type == 'person':
             return True
-        elif self.record_all_detections:
-            return True
-        
+            
         return False
-    
-    def is_in_cooldown(self, camera_id: str, detection: Dict[str, Any]) -> bool:
-        """Check if detection is in cooldown period"""
-        current_time = time.time()
-        detection_type = detection.get('name', '').lower()
-        
-        with self.detection_cache_lock:
-            cooldown_key = f"{camera_id}_{detection_type}"
-            
-            if cooldown_key in self.last_detection_time:
-                time_since_last = current_time - self.last_detection_time[cooldown_key]
-                if time_since_last < self.detection_cooldown:
-                    print(f"Detection cooldown active for {camera_id}/{detection_type}. "
-                          f"{time_since_last:.1f}s since last detection (need {self.detection_cooldown}s)")
-                    return True
-            
-            # Update last detection time if not in cooldown
-            self.last_detection_time[cooldown_key] = current_time
-            print(f"Recording detection: {detection_type} on camera {camera_id} with confidence {detection.get('conf', 0):.2f}")
-            return False
     
     def record_detection(self, camera_id: str, frame_data: FrameData, detection: Dict[str, Any]) -> Optional[DetectionEvent]:
         """Record a detection event"""
-        # Check if detection meets recording criteria
         if not self.should_record_detection(detection):
             return None
-            
-        # Check if detection is in cooldown period
-        if self.is_in_cooldown(camera_id, detection):
-            return None
-            
         try:
             # Create event object
             event = DetectionEvent(
@@ -136,77 +99,73 @@ class DetectionEventManager:
             
             # Create database record first
             db = self._get_db()
-            try:
-                db_detection = Detection(
-                    camera_id=camera_id,
-                    timestamp=event.timestamp,
-                    detection_type=event.detection_type,
-                    confidence=event.confidence,
-                    bounding_box=json.dumps(event.bounding_box),
-                    notified=False
-                )
-                db.add(db_detection)
-                db.commit()
-                db.refresh(db_detection)
-                event.id = db_detection.id
+            db_detection = Detection(
+                camera_id=camera_id,
+                timestamp=event.timestamp,
+                detection_type=event.detection_type,
+                confidence=event.confidence,
+                bounding_box=json.dumps(event.bounding_box),
+                notified=False
+            )
+            db.add(db_detection)
+            db.commit()
+            db.refresh(db_detection)
+            event.id = db_detection.id
+            
+            # Save annotated image with date-based organization
+            img_dir = self.images_path / camera_id / date_parts[0] / date_parts[1] / date_parts[2]
+            img_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Generate file name
+            base_filename = f"{camera_id}_{int(event.timestamp)}_{db_detection.id}_{event.detection_type}.jpg"
+            img_path = img_dir / base_filename
+            
+            # Create annotated frame and save
+            annotated_frame = self._annotate_frame(frame_data.frame, detection, event.timestamp)
+            cv2.imwrite(str(img_path), annotated_frame)
+            
+            # Store relative path in database
+            img_rel_path = str(img_path.relative_to(self.storage_path))
+            
+            # Create thumbnail
+            thumbnail_dir = self.thumbnails_path / camera_id / date_parts[0] / date_parts[1] / date_parts[2]
+            thumbnail_dir.mkdir(parents=True, exist_ok=True)
+            thumbnail_path = thumbnail_dir / base_filename
+            self._create_thumbnail(annotated_frame, thumbnail_path)
+            thumbnail_rel_path = str(thumbnail_path.relative_to(self.storage_path))
+            
+            # Save media records
+            image_media = Media(
+                camera_id=camera_id,
+                detection_id=db_detection.id,
+                media_type="image",
+                path=img_rel_path,
+                timestamp=event.timestamp,
+                size_bytes=os.path.getsize(img_path)
+            )
+            
+            thumbnail_media = Media(
+                camera_id=camera_id,
+                detection_id=db_detection.id,
+                media_type="thumbnail",
+                path=thumbnail_rel_path,
+                timestamp=event.timestamp,
+                size_bytes=os.path.getsize(thumbnail_path)
+            )
+            
+            db.add(image_media)
+            db.add(thumbnail_media)
+            db.commit()
+            
+            # Update event with path
+            event.image_path = str(img_path)
+            
+            # If person detected, start video recording
+            if event.detection_type.lower() == 'person':
+                self._start_video_recording(camera_id, event.timestamp, db_detection.id)
                 
-                # Save annotated image with date-based organization
-                img_dir = self.images_path / camera_id / date_parts[0] / date_parts[1] / date_parts[2]
-                img_dir.mkdir(parents=True, exist_ok=True)
-                
-                # Generate file name
-                base_filename = f"{camera_id}_{int(event.timestamp)}_{db_detection.id}_{event.detection_type}.jpg"
-                img_path = img_dir / base_filename
-                
-                # Create annotated frame and save
-                annotated_frame = self._annotate_frame(frame_data.frame, detection, event.timestamp)
-                cv2.imwrite(str(img_path), annotated_frame)
-                
-                # Store relative path in database
-                img_rel_path = str(img_path.relative_to(self.storage_path))
-                
-                # Create thumbnail
-                thumbnail_dir = self.thumbnails_path / camera_id / date_parts[0] / date_parts[1] / date_parts[2]
-                thumbnail_dir.mkdir(parents=True, exist_ok=True)
-                thumbnail_path = thumbnail_dir / base_filename
-                self._create_thumbnail(annotated_frame, thumbnail_path)
-                thumbnail_rel_path = str(thumbnail_path.relative_to(self.storage_path))
-                
-                # Save media records
-                image_media = Media(
-                    camera_id=camera_id,
-                    detection_id=db_detection.id,
-                    media_type="image",
-                    path=img_rel_path,
-                    timestamp=event.timestamp,
-                    size_bytes=os.path.getsize(img_path)
-                )
-                
-                thumbnail_media = Media(
-                    camera_id=camera_id,
-                    detection_id=db_detection.id,
-                    media_type="thumbnail",
-                    path=thumbnail_rel_path,
-                    timestamp=event.timestamp,
-                    size_bytes=os.path.getsize(thumbnail_path)
-                )
-                
-                db.add(image_media)
-                db.add(thumbnail_media)
-                db.commit()
-                
-                # Update event with path
-                event.image_path = str(img_path)
-                
-                # If person detected, start video recording
-                if event.detection_type.lower() == 'person':
-                    self._start_video_recording(camera_id, event.timestamp, db_detection.id)
-                    
-                return event
-                
-            finally:
-                db.close()
-                
+            return event
+            
         except Exception as e:
             print(f"Error recording detection: {e}")
             import traceback

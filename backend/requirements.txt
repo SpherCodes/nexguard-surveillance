@@ -1,0 +1,36 @@
+# NexGuard - AI-Powered Surveillance System Dependencies
+# Core web framework
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+python-multipart>=0.0.6
+
+# WebRTC and streaming
+aiortc>=1.6.0
+av>=10.0.0
+
+# Computer Vision and AI
+opencv-python>=4.8.0
+ultralytics>=8.0.0
+numpy>=1.24.0
+pillow>=9.5.0
+
+# Database
+sqlalchemy>=2.0.0
+alembic>=1.12.0
+
+# Async and utilities
+asyncio-mqtt>=0.13.0
+python-dotenv>=1.0.0
+pydantic>=2.4.0
+pydantic-settings>=2.0.0
+
+# Logging and monitoring
+loguru>=0.7.0
+
+# HTTP client
+httpx>=0.25.0
+aiofiles>=23.2.0
+
+# Note: For development dependencies, install with: pip install -e ".[dev]"
+# Note: For production dependencies, install with: pip install -e ".[production]"
+# Note: For GPU support, install with: pip install -e ".[gpu]"
