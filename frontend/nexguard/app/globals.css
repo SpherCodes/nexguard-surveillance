@@ -1,0 +1,39 @@
+@import "tailwindcss";
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Hide scrollbar for IE, Edge and Firefox */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+@layer utilities {
+  .root-layout {
+    @apply flex h-16 items-center justify-between p-5 sm:p-8 md:hidden;
+  }
+
+  /* Custom scrollbar utility */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Home - includes scrollbar hiding */
+  .home {
+    @apply flex w-full flex-row max-xl:max-h-screen max-xl:overflow-y-scroll;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .home::-webkit-scrollbar {
+    display: none;
+  }
+}

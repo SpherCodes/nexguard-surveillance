@@ -17,7 +17,7 @@ router = APIRouter()
 rtc_manager = RTCSessionManager()
 
 # Add WebSocket endpoint for signaling
-@router.websocket("/{camera_id}/webrtc")
+@router.websocket("/webrtc/{camera_id}")
 async def webrtc_signaling(
     websocket: WebSocket,
     camera_id: str,
@@ -26,6 +26,7 @@ async def webrtc_signaling(
     detection_event_manager: DetectionEventManager = Depends(get_detection_event_manager)
 ):
     """WebRTC signaling for camera streaming"""
+    print('Connecting WebRTC client to camera:', camera_id)
     try:
         await websocket.accept()
         
@@ -51,10 +52,20 @@ async def webrtc_signaling(
             
             if msg_type == "offer":
                 # Client sent an offer, create answer
+                sdp_data = message.get("sdp")
+                
+                # Check if sdp_data is a dictionary and extract the sdp string
+                if isinstance(sdp_data, dict) and "sdp" in sdp_data:
+                    sdp_string = sdp_data["sdp"]
+                else:
+                    sdp_string = sdp_data
+                    
+                print(f"Received offer SDP: {type(sdp_string)}")
+                
                 session_desc = await rtc_manager.create_answer(
                     camera_id, 
                     peer_id, 
-                    message.get("sdp"),
+                    sdp_string,  # Pass the SDP string, not the dictionary
                     inference_engine,
                     video_capture
                 )

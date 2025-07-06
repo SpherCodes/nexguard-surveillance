@@ -58,7 +58,7 @@ def setup_database():
                 ], capture_output=True, text=True, check=True)
                 
                 print("✅ Database migrations applied successfully")
-                
+                 
             except subprocess.CalledProcessError as e:
                 print(f"❌ Error applying migrations: {e}")
                 print(f"stdout: {e.stdout}")
@@ -101,14 +101,15 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # Include API routes
-app.include_router(api_router, prefix="/api")
+# app.include_router(api_router, prefix="/api")
+app.include_router(api_router, prefix="/api/v1")
 
 @app.get("/")
 async def root():
