@@ -3,7 +3,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { 
   Play, 
-  Pause, 
   Volume2, 
   VolumeX, 
   Maximize, 
@@ -15,22 +14,12 @@ import {
 import { connectToWebRtcStream } from '@/lib/services/webrtc'
 
 const Videocard = ({ camera }: { camera: Camera }) => {
+
   const videoRef = useRef<HTMLVideoElement>(null)
   const [isPlaying, setIsPlaying] = useState(true)
   const [isMuted, setIsMuted] = useState(true)
   const [showControls, setShowControls] = useState(false)
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting')
-
-  const togglePlay = () => {
-    if (videoRef.current) {
-      if (isPlaying) {
-        videoRef.current.pause()
-      } else {
-        videoRef.current.play()
-      }
-      setIsPlaying(!isPlaying)
-    }
-  }
 
   const toggleMute = () => {
     if (videoRef.current) {
@@ -41,7 +30,8 @@ const Videocard = ({ camera }: { camera: Camera }) => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'online': return 'bg-green-500'
+      case 'online': 
+      case 'running': return 'bg-green-500'
       case 'recording': return 'bg-red-500 animate-pulse'
       case 'offline': return 'bg-gray-400'
       default: return 'bg-gray-400'
@@ -50,22 +40,80 @@ const Videocard = ({ camera }: { camera: Camera }) => {
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'online': return <Wifi className="h-4 w-4 text-green-500" />
+      case 'online':
+      case 'running': return <Wifi className="h-4 w-4 text-green-500" />
       case 'recording': return <Circle className="h-4 w-4 text-red-500 fill-current animate-pulse" />
       case 'offline': return <WifiOff className="h-4 w-4 text-gray-400" />
       default: return <WifiOff className="h-4 w-4 text-gray-400" />
     }
   }
 
+  // Helper function to get display status
+  const getDisplayStatus = (status: string) => {
+    switch (status) {
+      case 'running': return 'online'
+      default: return status
+    }
+  }
+
   useEffect(() => {
-    // Only attempt to connect if camera is not offline
-    if (camera.status !== 'offline') {
+    // Copy the video element reference to use in cleanup
+    const videoElement = videoRef.current;
+    
+    // Add validation for camera and camera.camera_id
+    if (!camera) {
+      console.error('No camera object provided');
+      setConnectionStatus('disconnected');
+      return;
+    }
+
+    if (!camera.camera_id) {
+      console.error('Camera ID is missing or empty:', camera);
+      setConnectionStatus('disconnected');
+      return;
+    }
+
+    // Only attempt to connect if camera is enabled and not offline
+    if (camera.enabled && camera.status !== 'offline') {
+      let connectionAttempts = 0;
+      const maxConnectionAttempts = 3;
+      let connectionTimer: NodeJS.Timeout;
+      
       const initWebRTC = async () => {
         try {
+          console.log(`Attempting WebRTC connection for camera: ${camera.camera_id}`);
           setConnectionStatus('connecting');
-          const mediaStream = await connectToWebRtcStream(camera.id);
+          
+          // Clear any existing connection timer
+          if (connectionTimer) clearTimeout(connectionTimer);
+          
+          // Set a connection timeout
+          connectionTimer = setTimeout(() => {
+            console.error(`Connection timeout for camera ${camera.camera_id}`);
+            setConnectionStatus('disconnected');
+          }, 15000); // 15 seconds timeout
+          
+          // Convert camera.camera_id to string if it's not already
+          const cameraId = String(camera.camera_id);
+          const mediaStream = await connectToWebRtcStream(cameraId);
 
-          if (mediaStream && videoRef.current) {
+          clearTimeout(connectionTimer);
+          
+          if (!mediaStream) {
+            throw new Error('No media stream received');
+          }
+          
+          // Check if the stream has tracks
+          if (mediaStream.getTracks().length === 0) {
+            console.warn('Media stream has no tracks');
+            // Wait a bit to see if tracks arrive late
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            if (mediaStream.getTracks().length === 0) {
+              throw new Error('Media stream has no tracks after waiting');
+            }
+          }
+
+          if (videoRef.current) {
             // Make sure to directly set the srcObject
             videoRef.current.srcObject = mediaStream;
             
@@ -90,12 +138,19 @@ const Videocard = ({ camera }: { camera: Camera }) => {
               setConnectionStatus('disconnected');
             };
           } else {
-            console.error('Failed to connect: No media stream available');
-            setConnectionStatus('disconnected');
+            throw new Error('Video reference is not available');
           }
         } catch (error) {
           console.error('Error connecting to WebRTC stream:', error);
+          clearTimeout(connectionTimer);
           setConnectionStatus('disconnected');
+          
+          // Try reconnecting if we haven't reached max attempts
+          if (connectionAttempts < maxConnectionAttempts) {
+            connectionAttempts++;
+            console.log(`Retrying connection (${connectionAttempts}/${maxConnectionAttempts})`);
+            setTimeout(initWebRTC, 3000); // Wait 3 seconds before retry
+          }
         }
       };
       
@@ -103,15 +158,34 @@ const Videocard = ({ camera }: { camera: Camera }) => {
       
       // Cleanup function
       return () => {
-        if (videoRef.current && videoRef.current.srcObject) {
-          const mediaStream = videoRef.current.srcObject as MediaStream;
-          mediaStream.getTracks().forEach(track => track.stop());
+        if (connectionTimer) clearTimeout(connectionTimer);
+        
+        if (videoElement && videoElement.srcObject) {
+          const mediaStream = videoElement.srcObject as MediaStream;
+          mediaStream.getTracks().forEach(track => {
+            track.stop();
+            console.log(`Stopped track: ${track.kind}`);
+          });
           // Clear the srcObject
-          videoRef.current.srcObject = null;
+          videoElement.srcObject = null;
         }
       };
+    } else {
+      setConnectionStatus('disconnected');
     }
-  }, [camera.id, camera.status])
+  }, [camera?.camera_id, camera?.status, camera?.enabled])
+
+  // Early return if no camera data
+  if (!camera) {
+    return (
+      <div className="relative bg-black rounded-lg overflow-hidden aspect-video flex items-center justify-center">
+        <div className="text-white text-center">
+          <div className="text-4xl mb-2">⚠️</div>
+          <div>No camera data</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div 
@@ -131,13 +205,17 @@ const Videocard = ({ camera }: { camera: Camera }) => {
       />
 
       {/* Placeholder Background (shown while video loads or if offline) */}
-      {(connectionStatus !== 'connected' || camera.status === 'offline') && (
+      {(connectionStatus !== 'connected' || camera.status === 'offline' || !camera.enabled) && (
         <div className="absolute inset-0 bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center">
           <div className="text-center text-white">
             <div className="text-6xl mb-4">📹</div>
-            <div className="text-lg font-semibold">{camera.name}</div>
-            <div className="text-sm opacity-75">{camera.location}</div>
-            {connectionStatus === 'connecting' && camera.status !== 'offline' && (
+            <div className="text-lg font-semibold">{camera.name || `Camera ${camera.camera_id}`}</div>
+            <div className="text-sm opacity-75">{camera.location || 'Unknown Location'}</div>
+            <div className="text-xs opacity-50">ID: {camera.camera_id || 'No ID'}</div>
+            <div className="text-xs opacity-50">
+              {camera.resolution ? `${camera.resolution[0]}x${camera.resolution[1]}` : 'Unknown'} • {camera.fps || 'Unknown'}fps
+            </div>
+            {connectionStatus === 'connecting' && camera.enabled && camera.status !== 'offline' && (
               <div className="mt-4 flex items-center justify-center">
                 <div className="animate-spin h-6 w-6 border-2 border-white border-t-transparent rounded-full mr-2"></div>
                 <span>Connecting...</span>
@@ -146,8 +224,10 @@ const Videocard = ({ camera }: { camera: Camera }) => {
             {connectionStatus === 'disconnected' && (
               <div className="mt-4 text-red-400">Connection failed</div>
             )}
-            {camera.status === 'offline' && (
-              <div className="mt-4 text-gray-400">Camera offline</div>
+            {(camera.status === 'offline' || !camera.enabled) && (
+              <div className="mt-4 text-gray-400">
+                {!camera.enabled ? 'Camera disabled' : 'Camera offline'}
+              </div>
             )}
           </div>
         </div>
@@ -158,34 +238,28 @@ const Videocard = ({ camera }: { camera: Camera }) => {
         <div className="flex items-start justify-between">
           <div className="text-white">
             <div className="flex items-center space-x-2">
-              <h3 className="font-semibold">{camera.name}</h3>
+              <h3 className="font-semibold">{camera.name || `Camera ${camera.camera_id}`}</h3>
               {getStatusIcon(camera.status)}
             </div>
-            <p className="text-sm opacity-90">{camera.location}</p>
-            <p className="text-xs opacity-75">{camera.lastSeen}</p>
+            <p className="text-sm opacity-90">{camera.location || 'Unknown Location'}</p>
+            <p className="text-xs opacity-75">{camera.lastSeen || 'Active'}</p>
           </div>
           <div className="flex items-center space-x-1">
             <span className={`h-2 w-2 rounded-full ${getStatusColor(camera.status)}`}></span>
             <span className="text-xs text-white/90 uppercase font-medium">
-              {camera.status}
+              {getDisplayStatus(camera.status)}
             </span>
           </div>
         </div>
       </div>
 
       {/* Video Controls - Bottom (only shown when connected) */}
-      {camera.status !== 'offline' && connectionStatus === 'connected' && (
+      {camera.enabled && camera.status !== 'offline' && connectionStatus === 'connected' && (
         <div className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-4 transition-opacity duration-200 ${
           showControls ? 'opacity-100' : 'opacity-0'
         }`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
-              <button
-                onClick={togglePlay}
-                className="text-white hover:text-blue-400 transition-colors p-1 rounded-full hover:bg-white/10"
-              >
-                {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
-              </button>
               <button
                 onClick={toggleMute}
                 className="text-white hover:text-blue-400 transition-colors p-1 rounded-full hover:bg-white/10"
@@ -193,7 +267,7 @@ const Videocard = ({ camera }: { camera: Camera }) => {
                 {isMuted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
               </button>
               <span className="text-xs text-white/75">
-                {camera.resolution} • {camera.fps}fps
+                {camera.resolution ? `${camera.resolution[0]}x${camera.resolution[1]}` : 'Unknown'} • {camera.fps || 'Unknown'}fps
               </span>
             </div>
             <div className="flex items-center space-x-2">

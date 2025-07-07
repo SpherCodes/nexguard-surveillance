@@ -146,13 +146,13 @@ class YOLOProcessor:
                     frame_data.detections.append(detection)
                     
                     # Record detection synchronously
-                    if self.detection_manager:
-                        self.detection_manager.record_detection(camera_id, frame_data, detection)
+                    # if self.detection_manager:
+                    #     self.detection_manager.record_detection(camera_id, frame_data, detection)
                     
                     # Track human detection for UI
-                    if detection['name'].lower() == 'person':
-                        human_detected = True
-                        print(f"Human detected in camera {camera_id}")
+                    # if detection['name'].lower() == 'person':
+                    #     human_detected = True
+                    #     print(f"Human detected in camera {camera_id}")
             
             # Create annotated frame
             annotated_frame = frame_data.frame.copy()

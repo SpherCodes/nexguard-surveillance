@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     
     # Model Settings
     DEFAULT_MODEL_PATH: str = "../../models/yolo11s.pt"
-    CONFIDENCE_THRESHOLD: float = 0.5
+    CONFIDENCE_THRESHOLD: float = 1.0
     
     # Video Settings
     DEFAULT_FPS: int = 15
