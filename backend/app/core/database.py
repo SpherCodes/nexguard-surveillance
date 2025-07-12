@@ -7,7 +7,7 @@ from pathlib import Path
 data_dir = Path("./data")
 data_dir.mkdir(exist_ok=True)
 
-DatabaseURL = os.getenv("DATABASE_URL", "sqlite:///./data/nexguard.db")
+DatabaseURL = os.getenv("DATABASE_URL")
 
 engine = create_engine(
     DatabaseURL,
@@ -22,6 +22,8 @@ class Camera(Base):
     camera_id = Column(String, primary_key=True , unique=True, index=True)
     url = Column(String)
     name = Column(String, nullable=True)
+    zone_id = Column(Integer, ForeignKey("zones.id"), nullable=True, index=True)
+    zone = relationship("Zone", back_populates="cameras")
     location = Column(String, nullable=True)
     fps_target = Column(Integer, default=15)
     resolution_width = Column(Integer, default=640)
@@ -31,8 +33,8 @@ class Camera(Base):
     last_active = Column(DateTime, nullable=True)
     
     # Relationships
-    detections = relationship("Detection", back_populates="camera", cascade="all, delete-orphan")
-    media = relationship("Media", back_populates="camera", cascade="all, delete-orphan")
+    detections = relationship("Detection", back_populates="camera")
+    media = relationship("Media", back_populates="camera")
 
 class Detection(Base):
     __tablename__ = "detections"
@@ -49,6 +51,18 @@ class Detection(Base):
     # Relationships
     camera = relationship("Camera", back_populates="detections")
     media = relationship("Media", back_populates="detection")
+    
+class Zone(Base):
+    __tablename__ = "zones"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True, nullable=False)
+    description = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.now)
+
+    # Relationships
+    cameras = relationship("Camera", back_populates="zone", cascade="all, delete")
+
 
 class Media(Base):
     __tablename__ = "media"

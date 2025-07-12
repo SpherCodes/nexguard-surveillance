@@ -29,7 +29,7 @@ async def webrtc_signaling(
     print('Connecting WebRTC client to camera:', camera_id)
     try:
         await websocket.accept()
-        
+        print(f"WebRTC client connected for camera {video_capture.cameras}")
         if camera_id not in video_capture.cameras:
             await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason=f"Camera {camera_id} not found")
             return

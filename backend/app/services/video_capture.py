@@ -21,6 +21,8 @@ class CameraConfig:
     resolution: Tuple[int, int] = (1280, 720)  # (width, height)
     buffer_size: int = 10  # Number of frames to keep in buffer
     enabled: bool = True
+    location: str = "Unknown"
+    zone_id: int = 0  # Zone ID for camera grouping
 
 
 class FrameData:
@@ -48,25 +50,6 @@ class VideoCapture:
         self.threads: Dict[str, threading.Thread] = {}
         self.last_frame_time: Dict[str, float] = {}
         self.frame_counts: Dict[str, int] = {}
-        
-        # Add default test cameras
-        self.add_camera(CameraConfig(
-            camera_id="0",
-            url="0",  # First webcam
-            fps_target=15,
-            resolution=(640, 480),
-            buffer_size=10,
-            enabled=True
-        ))
-        
-        self.add_camera(CameraConfig(
-            camera_id="1",
-            url="1",  # Second webcam
-            fps_target=15,
-            resolution=(640, 480),
-            buffer_size=10,
-            enabled=True
-        ))
         
     def add_camera(self, config: CameraConfig) -> bool:
         """Add a camera to be monitored."""
@@ -116,6 +99,7 @@ class VideoCapture:
     def start_all_cameras(self):
         """Start capturing from all enabled cameras."""
         for camera_id, config in self.cameras.items():
+            print(f"Starting camera {camera_id} with URL {config.url}")
             if config.enabled and (camera_id not in self.threads or not self.threads[camera_id].is_alive()):
                 self._start_camera_thread(camera_id)
     
@@ -180,7 +164,7 @@ class VideoCapture:
                 
             
             if not stream.isOpened():
-                print(f"Failed to open {config.url} after retries")
+                print(f"Failed to open {config.camera_id} after retries")
                 return
         
             time.sleep(1.0)
@@ -354,3 +338,5 @@ class VideoCapture:
         
         # Assuming self.threads contains the active camera threads
         return (camera_id in self.threads and self.threads[camera_id].is_alive())
+    
+video_capture  = VideoCapture()

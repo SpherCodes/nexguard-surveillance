@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
 from typing import List, Optional
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 import time
 from sqlalchemy.orm import Session
 
@@ -14,28 +14,28 @@ router = APIRouter()
 
 @router.get("/recent")
 async def get_recent_detections(
-    camera_id: Optional[str] = None,
-    detection_type: Optional[str] = None,
-    hours: int = 24,
+    # camera_id: Optional[str] = None,
+    # detection_type: Optional[str] = None,
+    # hours: int = 24,
     db: Session = Depends(get_db)
 ):
     """Get recent detection events from database"""
     # Calculate the timestamp threshold
-    cutoff_time = time.time() - (hours * 3600)
+    # cutoff_time = time.time() - (hours * 3600)
     
     # Build query
-    query = db.query(Detection).filter(Detection.timestamp > cutoff_time)
+    # query = db.query(Detection).filter(Detection.timestamp > cutoff_time)
     
-    if camera_id:
-        query = query.filter(Detection.camera_id == camera_id)
+    # if camera_id:
+    #     query = query.filter(Detection.camera_id == camera_id)
         
-    if detection_type:
-        query = query.filter(Detection.detection_type == detection_type)
+    # if detection_type:
+    #     query = query.filter(Detection.detection_type == detection_type)
         
-    query = query.order_by(Detection.timestamp.desc())
+    # query = query.order_by(Detection.timestamp.desc())
     
     # Execute query
-    detections = query.all()
+    detections = db.query(Detection).all()
     
     # Convert to API-friendly format
     result = []
@@ -45,7 +45,19 @@ async def get_recent_detections(
             Media.detection_id == detection.id,
             Media.media_type == "image"
         ).first()
-        
+        # Find associated thumbnail
+        thumbnail_media = db.query(Media).filter(
+            Media.detection_id == detection.id,
+            Media.media_type == "thumbnail"
+        ).first()
+        # Read thumbnail file as base64 if available
+        thumbnail_b64 = None
+        if thumbnail_media:
+            file_path = os.path.join("data/storage", thumbnail_media.path)
+            if os.path.exists(file_path):
+                with open(file_path, "rb") as f:
+                    import base64
+                    thumbnail_b64 = base64.b64encode(f.read()).decode("utf-8")
         result.append({
             "id": detection.id,
             "camera_id": detection.camera_id,
@@ -54,10 +66,34 @@ async def get_recent_detections(
             "detection_type": detection.detection_type,
             "confidence": detection.confidence,
             "has_image": bool(image_media),
-            "notified": detection.notified
+            "notified": detection.notified,
+            "thumbnail": thumbnail_b64
         })
         
     return result
+
+@router.get('/detections/{date}')
+async def get_detections_by_date(
+    date: str,
+    db: Session = Depends(get_db)
+):
+    """Get detections for a specific date"""
+    try:
+        # Parse the date string
+        date_obj = datetime.strptime(date, "%Y-%m-%d")
+        start_timestamp = int(date_obj.timestamp())
+        end_timestamp = int((date_obj + timedelta(days=1)).timestamp())
+        
+        # Query detections within the date range
+        detections = db.query(Detection).filter(
+            Detection.timestamp >= start_timestamp,
+            Detection.timestamp < end_timestamp
+        ).all()
+        
+        return [detection.to_dict() for detection in detections]
+    
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
 
 @router.get("/stats")
 async def get_detection_stats(db: Session = Depends(get_db)):

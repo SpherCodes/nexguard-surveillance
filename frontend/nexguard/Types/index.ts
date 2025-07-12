@@ -8,7 +8,7 @@ declare interface Camera {
   fps: number;
   resolution: [number, number];
   videoUrl?: string;
-  lastSeen?: string;
+  zoneId?: number;
 }
 
 declare interface NormalizedCamera {
@@ -20,4 +20,23 @@ declare interface NormalizedCamera {
   lastSeen?: string;
   resolution?: string;
   fps?: number;
+}
+
+declare interface FeedProps{
+  alertEvent: DetectionEvent;
+}
+
+declare type DetectionEvent =  {
+  id: string;
+  cameraId: string;
+  type: string;
+  timestamp: string;
+  description?: string;
+  thumbnailImg: string;
+  confidence: GLfloat;
+}
+
+declare interface Zone {
+  id: string;
+  name: string;
 }
