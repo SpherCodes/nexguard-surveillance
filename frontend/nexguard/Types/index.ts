@@ -1,9 +1,12 @@
+import { cameraFormSchema } from "@/lib/utils";
+import z from "zod";
+
 /* eslint-disable @typescript-eslint/no-unused-vars */
 declare interface Camera {
   camera_id: string;
   name?: string;
   location?: string;
-  status: 'online' | 'offline' | 'recording' | 'running';
+  status: 'online' | 'offline' | 'recording';
   enabled: boolean;
   fps: number;
   resolution: [number, number];
@@ -11,16 +14,6 @@ declare interface Camera {
   zoneId?: number;
 }
 
-declare interface NormalizedCamera {
-  id: string;
-  name: string;
-  location: string;
-  status: 'online' | 'offline' | 'recording';
-  videoUrl?: string;
-  lastSeen?: string;
-  resolution?: string;
-  fps?: number;
-}
 
 declare interface FeedProps{
   alertEvent: DetectionEvent;
@@ -34,9 +27,22 @@ declare type DetectionEvent =  {
   description?: string;
   thumbnailImg: string;
   confidence: GLfloat;
+  thumbnail?: string;
 }
 
 declare interface Zone {
-  id: string;
+  id: number;
   name: string;
 }
+
+type CameraFormData = z.infer<typeof cameraFormSchema>;
+
+interface CameraFormProps {
+  initialData?: Camera | null;
+  zones: Zone[];
+  onSubmit: (data: CameraFormData, id?: string) => void;
+  onDelete?: (id: string) => void;
+  onCreateZone: (zoneName: string) => Promise<Zone>;
+}
+
+export { type Camera, type CameraFormData, type CameraFormProps , type FeedProps, type DetectionEvent, type Zone };

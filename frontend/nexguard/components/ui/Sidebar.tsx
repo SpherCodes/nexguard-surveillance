@@ -5,61 +5,78 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import React from 'react'
+import { cn } from '@/lib/utils'
+
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from '@/components/ui/avatar'
 
 const Sidebar = () => {
   const pathname = usePathname()
-
   return (
-    <aside className="h-screen w-52 bg-white flex flex-col">
-      <nav className="flex flex-col p-5 gap-8">
-
-        {/* Logo */}
-        <Link href="/" className="flex items-center gap-3">
-          <Image 
-            src="/NexGuardShield.png"
-            alt="NexGuard Logo"
-            width={40}
-            height={40}
-            className="object-contain"
-          />
-          <div>
-            <h1 className="text-lg font-semibold text-gray-800">NexGuard</h1>
-            <p className="text-xs text-gray-500 leading-tight">Security System</p>
-          </div>
-        </Link>
-
-        {/* Navigation Links */}
-        <ul className="flex flex-col gap-1">
+    <TooltipProvider delayDuration={0}>
+      <aside className="h-screen min-w-[5em] flex flex-col bg-white">
+        <div className="flex flex-col items-center px-2 py-5">
+          <Link
+            href="/"
+            className="group flex h-10 w-10 shrink-0 items-center justify-center gap-2 rounded-full text-lg font-semibold"
+          >
+            <Image 
+              src="/NexGuardShield.png"
+              alt="NexGuard Logo"
+              width={60}
+              height={60}
+              className="transition-transform group-hover:scale-110"
+            />
+            <span className="sr-only">NexGuard</span>
+          </Link>
+        </div>
+        <nav className="flex flex-col items-center gap-4 flex-grow justify-center">
           {SidebarLinks.map((item) => {
-            const isActive = pathname === item.route || pathname.startsWith(item.route)
+            const isActive = item.route === '/' 
+              ? pathname === item.route 
+              : pathname.startsWith(item.route);
 
             return (
-              <li key={item.label}>
-                <Link
-                  href={item.route}
-                  className={`
-                    flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors
-                    ${isActive 
-                      ? 'bg-blue-100 text-blue-700 shadow-inner' 
-                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                    }
-                  `}
-                >
-                  {item.icon && (
-                    <item.icon
-                      className={`h-5 w-5 transition-colors ${
-                        isActive ? 'text-blue-600' : 'text-gray-400'
-                      }`}
-                    />
-                  )}
-                  <span className="truncate">{item.label}</span>
-                </Link>
-              </li>
+              <Tooltip key={item.label}>
+                <TooltipTrigger asChild>
+                  <Link
+                    href={item.route}
+                    className={cn(
+                      "flex h-10 w-10 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900",
+                      isActive && "bg-gray-900 text-white"
+                    )}
+                  >
+                    <item.icon className="h-5 w-5" />
+                    <span className="sr-only">{item.label}</span>
+                  </Link>
+                </TooltipTrigger>
+                <TooltipContent side="right" sideOffset={5}>
+                  {item.label}
+                </TooltipContent>
+              </Tooltip>
             )
           })}
-        </ul>
-      </nav>
-    </aside>
+        </nav>
+
+        {/* Bottom Section: User Profile
+        <div className="mt-auto flex flex-col items-center gap-4 p-4">
+            <Avatar className="h-10 w-10 border dark:border-gray-700">
+                <AvatarImage src="https://github.com/shadcn.png" alt="User Avatar" />
+                <AvatarFallback>U</AvatarFallback>
+            </Avatar>
+        </div> */}
+
+      </aside>
+    </TooltipProvider>
   )
 }
 

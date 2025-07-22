@@ -20,7 +20,7 @@ rtc_manager = RTCSessionManager()
 @router.websocket("/webrtc/{camera_id}")
 async def webrtc_signaling(
     websocket: WebSocket,
-    camera_id: str,
+    camera_id: int,
     video_capture: VideoCapture = Depends(get_video_capture),
     inference_engine: inference_engine = Depends(get_inference_engine),
     detection_event_manager: DetectionEventManager = Depends(get_detection_event_manager)
@@ -29,20 +29,21 @@ async def webrtc_signaling(
     print('Connecting WebRTC client to camera:', camera_id)
     try:
         await websocket.accept()
-        print(f"WebRTC client connected for camera {video_capture.cameras}")
+        print(f'WebRTC socket connected for camera {camera_id}')
+        camera_id = camera_id
         if camera_id not in video_capture.cameras:
+            print('video_capture.cameras:', video_capture.cameras)
+            print(f"Camera {camera_id} not found in video capture service!!")
             await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason=f"Camera {camera_id} not found")
             return
             
         peer_id = f"client_{websocket.client.host}_{websocket.client.port}"
-        print(f'peer_id: {peer_id}, camera_id: {camera_id}')
-        print(f"WebRTC client connected: {peer_id} for camera {camera_id}")
         
         # Make sure camera is running
         if not video_capture.is_camera_running(camera_id):
             video_capture._start_camera_thread(camera_id)
         if inference_engine:
-            inference_engine.start_processing(camera_id)
+            inference_engine.start_processing([camera_id])
         
         # Handle signaling messages
         while True:
@@ -59,13 +60,11 @@ async def webrtc_signaling(
                     sdp_string = sdp_data["sdp"]
                 else:
                     sdp_string = sdp_data
-                    
-                print(f"Received offer SDP: {type(sdp_string)}")
                 
                 session_desc = await rtc_manager.create_answer(
                     camera_id, 
                     peer_id, 
-                    sdp_string,  # Pass the SDP string, not the dictionary
+                    sdp_string,
                     inference_engine,
                     video_capture
                 )
@@ -73,11 +72,11 @@ async def webrtc_signaling(
                     "type": "answer",
                     "sdp": session_desc
                 })
+                print(f"Sent answer SDP for camera {camera_id} to peer {peer_id}")
                 
             elif msg_type == "ice-candidate":
                 # Convert dict to RTCIceCandidate object
                 candidate_dict = message.get("candidate")
-                print(f"Received ICE candidate: {candidate_dict}")
                 if candidate_dict and "candidate" in candidate_dict:
                     try:
                         ice_candidate = RTCIceCandidate(

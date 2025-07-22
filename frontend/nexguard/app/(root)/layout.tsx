@@ -1,28 +1,27 @@
 'use client'
-import React, { useEffect, useState } from 'react'
-import Sidebar from '../../components/ui/Sidebar'
+
+import React from 'react'
+import Sidebar from '@/components/ui/Sidebar'
 import RightFeed from '@/components/ui/RightFeed'
-import { getLatestAlerts } from '@/lib/actions/api.actions'
+import { Providers } from '../providers'
 
 const RootLayout = ({ children }: { children: React.ReactNode }) => {
-  const [recentAlerts, setRecentAlerts] = useState<any[]>([])
-
-  useEffect(() => {
-    getLatestAlerts().then(alerts => {
-      setRecentAlerts(alerts)
-    })
-  }, [])
-
   return (
-    <main className="flex h-screen w-full">
-      <Sidebar />
-      <div className="flex-1 flex-col mx-1 h-screen overflow-y-auto">
-        {children}
-      </div>
-      <div className=" flex flex-col max-w-[22em] w-full">
-        <RightFeed alertEvent={recentAlerts} />
-      </div>
-    </main>
+    <Providers>
+      <main className="flex h-screen w-full bg-white">
+        <Sidebar />
+        <div className="flex flex-1 overflow-hidden">
+          <div className="flex-1 flex-col overflow-y-auto border rounded-xl bg-gray-100">
+            <div className="p-4 sm:p-6 lg:p-8">
+              {children}
+            </div>
+          </div>
+          <div className="hidden w-80 flex-col lg:flex">
+            <RightFeed />
+          </div>
+        </div>
+      </main>
+    </Providers>
   )
 }
 

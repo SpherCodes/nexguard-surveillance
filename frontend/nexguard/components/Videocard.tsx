@@ -2,10 +2,12 @@ import { Wifi, MoreHorizontal } from 'lucide-react'
 import { connectToWebRtcStream } from '@/lib/services/webrtc';
 import { useEffect } from 'react';
 import React from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { Camera } from '@/Types';
 
 const Videocard = ({ camera }: { camera: Camera }) => {
   const videoRef = React.useRef<HTMLVideoElement>(null);
-  const [connectionStatus, setConnectionStatus] = React.useState<'connecting' | 'connected' | 'disconnected'>('connecting');
+  const queryClient = useQueryClient();
   const timestamp = new Date().toLocaleString('en-US', { 
     month: '2-digit', 
     day: '2-digit', 
@@ -16,32 +18,26 @@ const Videocard = ({ camera }: { camera: Camera }) => {
   }).replace(',', '');
 
 useEffect(() => {
-    // Copy the video element reference to use in cleanup
     const videoElement = videoRef.current;
-    
-    // Add validation for camera and camera.camera_id
+
     if (!camera) {
       console.error('No camera object provided');
-      setConnectionStatus('disconnected');
       return;
     }
 
     if (!camera.camera_id) {
       console.error('Camera ID is missing or empty:', camera);
-      setConnectionStatus('disconnected');
       return;
     }
 
     // Only attempt to connect if camera is enabled and not offline
-    if (camera.enabled && camera.status !== 'offline') {
+    if (camera.enabled) {
       let connectionAttempts = 0;
       const maxConnectionAttempts = 3;
       let connectionTimer: NodeJS.Timeout;
       
       const initWebRTC = async () => {
         try {
-          console.log(`Attempting WebRTC connection for camera: ${camera.camera_id}`);
-          setConnectionStatus('connecting');
           
           // Clear any existing connection timer
           if (connectionTimer) clearTimeout(connectionTimer);
@@ -49,7 +45,6 @@ useEffect(() => {
           // Set a connection timeout
           connectionTimer = setTimeout(() => {
             console.error(`Connection timeout for camera ${camera.camera_id}`);
-            setConnectionStatus('disconnected');
           }, 15000); // 15 seconds timeout
           
           // Convert camera.camera_id to string if it's not already
@@ -78,22 +73,25 @@ useEffect(() => {
             
             // Add event listeners to confirm video is playing
             videoRef.current.onloadedmetadata = () => {
-              console.log("Video metadata loaded, playing...");
               videoRef.current?.play()
                 .then(() => {
-                  console.log("Video playback started successfully");
-                  setConnectionStatus('connected');
+                  if (camera.status !== 'online') {
+                  updateCameraStatusInCache(camera.camera_id, 'online');
+                    console.log(`Camera is now online:`, JSON.stringify(camera, null, 2));
+                }
                 })
-                .catch(err => {
-                  console.error("Error playing video:", err);
-                  setConnectionStatus('disconnected');
+                .catch(() => {
+                  if (camera.status !== 'offline') {
+                    updateCameraStatusInCache(camera.camera_id, 'offline');
+                  }
                 });
             };
             
-            // Add error handler for video element
             videoRef.current.onerror = (err) => {
+              if (camera.status !== 'offline') {
+                  updateCameraStatusInCache(camera.camera_id, 'offline');
+                }
               console.error("Video element error:", err);
-              setConnectionStatus('disconnected');
             };
           } else {
             throw new Error('Video reference is not available');
@@ -101,7 +99,6 @@ useEffect(() => {
         } catch (error) {
           console.error('Error connecting to WebRTC stream:', error);
           clearTimeout(connectionTimer);
-          setConnectionStatus('disconnected');
           
           // Try reconnecting if we haven't reached max attempts
           if (connectionAttempts < maxConnectionAttempts) {
@@ -128,10 +125,22 @@ useEffect(() => {
           videoElement.srcObject = null;
         }
       };
-    } else {
-      setConnectionStatus('disconnected');
     }
+    
   }, [camera?.camera_id, camera?.status, camera?.enabled])
+
+  const updateCameraStatusInCache = (cameraId: string, status: 'online' | 'offline') => {
+  queryClient.setQueryData<Camera[]>(['cameras'], (prev) =>
+    prev?.map((cam) => {
+      if (cam.camera_id === cameraId) {
+        console.log(`Updated camera ${cameraId} status to ${status}`);
+        return { ...cam, status };
+      }
+      return cam;
+    }) || []
+  );
+};
+
 
 
   return (

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Path
 from typing import List, Tuple
 from pydantic import BaseModel, HttpUrl, field_validator
 from requests import Session
@@ -11,23 +11,21 @@ from ...services.video_capture import CameraConfig, VideoCapture as video_captur
 router = APIRouter()
 
 class CameraConfigRequest(BaseModel):
-    camera_id: str
+    name: str = "Default"
     url: str
-    resolution: Tuple[int, int] = (640, 480)
-    buffer_size: int = 10
-    enabled: bool = True
+    enabled: bool = False
     location: str = "Unknown"
     zoneId: int = 0
 
-    @field_validator("url")
-    @classmethod
-    def url_must_not_be_empty(cls, v: str) -> str:
-        if not v.strip():
-            raise ValueError("Camera URL must not be empty")
-        return v
+    # @field_validator("url")
+    # @classmethod
+    # def url_must_not_be_empty(cls, v: str) -> str:
+    #     if not v.strip():
+    #         raise ValueError("Camera URL must not be empty")
+    #     return v
 class CameraStatusResponse(BaseModel):
-    camera_id: str
-    resolution: tuple
+    name:str
+    camera_id: int
     enabled: bool
     location: str = "Unknown"
     zoneId: int = 0
@@ -41,13 +39,13 @@ async def list_cameras(
     try:
         cameras = db.query(Camera).all()
         if not cameras:
-            raise HTTPException(status_code=404, detail="No cameras found")
+            return []
         
         response = []
         for cam in cameras:
             response.append(CameraStatusResponse(
+                name=cam.name,
                 camera_id=cam.camera_id,
-                resolution=(cam.resolution_width, cam.resolution_height),
                 enabled=cam.enabled,
                 location=cam.location,
                 zoneId=cam.zone_id if cam.zone_id is not None else 0
@@ -65,47 +63,68 @@ async def add_camera(
 ):
     """Add a new camera to the system"""
     try:
-        # Check if camera already exists in DB
-        existing = db.query(Camera).filter(Camera.camera_id == camera_config.camera_id).first()
-        if existing:
-            raise HTTPException(status_code=400, detail=f"Camera {camera_config.camera_id} already exists")
-        
-        # Create runtime camera config
-        print(f"Adding camera {camera_config.camera_id} with URL {camera_config.url}")
-        config = CameraConfig(
-            camera_id=camera_config.camera_id,
+        # Add to database
+        db_camera = Camera(
+            name = camera_config.name,
             url=camera_config.url,
-            resolution=camera_config.resolution,
-            buffer_size=camera_config.buffer_size,
             enabled=camera_config.enabled,
             location=camera_config.location,
             zone_id=camera_config.zoneId if camera_config.zoneId is not None else 0
         )
+
+
+        db.add(db_camera)
+        db.commit()
+        db.refresh(db_camera)
         
-        print(f"Camera config created: {config}")
+        camera = db.query(Camera).order_by(Camera.camera_id.desc()).first()
+        
+        config = CameraConfig(
+            camera_id=camera.camera_id,
+            url=camera.url,
+            enabled=camera.enabled,
+            location=camera.location,
+        )
         
         # Add to video capture service
         video_capture.add_camera(config)
         
-        # Add to database
-        db_camera = Camera(
-            camera_id=camera_config.camera_id,
-            url=camera_config.url,
-            resolution_width=camera_config.resolution[0],
-            resolution_height=camera_config.resolution[1],
-            enabled=camera_config.enabled,
-            location=camera_config.location,
-            zone_id=camera_config.zoneId if camera_config.zoneId is not None else 0
-        )
         
-        db.add(db_camera)
+        return {"message": f"Camera added successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.put("/update/{id}")
+async def update_camera(
+    id: int = Path(..., description="Camera ID"),
+    camera_config: CameraConfigRequest = ...,
+    video_capture: video_capture = Depends(get_video_capture),
+    db: Session = Depends(get_db)
+):
+    """Update an existing camera"""
+    try:
+        print(f"Updating camera {id} with config: {camera_config}")
+        # Find existing camera
+        existing_camera = db.query(Camera).filter(Camera.camera_id == id).first()
+        if not existing_camera:
+            raise HTTPException(status_code=404, detail="Camera not found")
+        
+        # Update database record
+        existing_camera.name = camera_config.name
+        existing_camera.url = camera_config.url
+        existing_camera.enabled = camera_config.enabled
+        existing_camera.location = camera_config.location
+        existing_camera.zone_id = camera_config.zoneId if camera_config.zoneId is not None else 0
+
         db.commit()
         
-        return {"message": f"Camera {camera_config.camera_id} added successfully"}
+        # Update in video capture service
+        video_capture.update_camera(existing_camera)
+        
+        return {"message": "Camera updated successfully"}
     except Exception as e:
-        print(f"Error adding camera {camera_config.camera_id}: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
-    
+
 @router.post("/{camera_id}/start", operation_id="start_camera_unique")
 async def start_camera(
     camera_id: str, 

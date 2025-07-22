@@ -89,7 +89,8 @@ async def get_detections_by_date(
             Detection.timestamp >= start_timestamp,
             Detection.timestamp < end_timestamp
         ).all()
-        
+        if not detections:
+            return []
         return [detection.to_dict() for detection in detections]
     
     except ValueError:

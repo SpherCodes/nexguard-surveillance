@@ -35,7 +35,7 @@ class FrameData:
         self.timestamp = timestamp
         self.frame_number = frame_number
         self.resolution = resolution
-        self.detections = []  # Will be populated by the AI module
+        self.detections = []
         self.processed = False
 
 
@@ -43,7 +43,7 @@ class VideoCapture:
     """Handles video capture from multiple sources."""
     
     def __init__(self):
-        self.cameras: Dict[str, CameraConfig] = {}
+        self.cameras: Dict[int, CameraConfig] = {}
         self.streams: Dict[str, Any] = {}
         self.frame_buffers: Dict[str, queue.Queue] = {}
         self.stop_flags: Dict[str, bool] = {}
@@ -54,7 +54,6 @@ class VideoCapture:
     def add_camera(self, config: CameraConfig) -> bool:
         """Add a camera to be monitored."""
         if config.camera_id in self.cameras:
-            print(f"Camera {config.camera_id} already exists. Use update_camera instead.")
             return False
         
         self.cameras[config.camera_id] = config
@@ -99,7 +98,8 @@ class VideoCapture:
     def start_all_cameras(self):
         """Start capturing from all enabled cameras."""
         for camera_id, config in self.cameras.items():
-            print(f"Starting camera {camera_id} with URL {config.url}")
+            print(f"Starting camera {camera_id} with URL {config}")
+            print(f"Available cameras: {self.cameras.keys()}")
             if config.enabled and (camera_id not in self.threads or not self.threads[camera_id].is_alive()):
                 self._start_camera_thread(camera_id)
     

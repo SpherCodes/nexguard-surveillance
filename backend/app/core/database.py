@@ -1,8 +1,10 @@
 from datetime import datetime
-from sqlalchemy import JSON, Column, DateTime, Integer, String, Float, Boolean, ForeignKey, create_engine
+from sqlalchemy import JSON, Column, DateTime, Integer, String, Float, Boolean, ForeignKey, create_engine, func, select
 from sqlalchemy.orm import relationship, sessionmaker, declarative_base
+from sqlalchemy import event
 import os
 from pathlib import Path
+
 
 data_dir = Path("./data")
 data_dir.mkdir(exist_ok=True)
@@ -18,8 +20,7 @@ Base = declarative_base()
 
 class Camera(Base):
     __tablename__ = "cameras"
-    """Represents a camera in the system"""
-    camera_id = Column(String, primary_key=True , unique=True, index=True)
+    camera_id = Column(Integer, primary_key=True ,  autoincrement=True,unique=True, index=True)
     url = Column(String)
     name = Column(String, nullable=True)
     zone_id = Column(Integer, ForeignKey("zones.id"), nullable=True, index=True)
@@ -31,8 +32,7 @@ class Camera(Base):
     enabled = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.now)
     last_active = Column(DateTime, nullable=True)
-    
-    # Relationships
+
     detections = relationship("Detection", back_populates="camera")
     media = relationship("Media", back_populates="camera")
 
@@ -40,7 +40,7 @@ class Detection(Base):
     __tablename__ = "detections"
     """Represents a detection event from a camera"""
     id = Column(Integer, primary_key=True, index=True)
-    camera_id = Column(String, ForeignKey("cameras.camera_id"), index=True)
+    camera_id = Column(Integer, ForeignKey("cameras.camera_id"), index=True)
     timestamp = Column(Float, index=True)
     detection_type = Column(String, index=True)
     confidence = Column(Float)
@@ -68,7 +68,7 @@ class Media(Base):
     __tablename__ = "media"
     
     id = Column(Integer, primary_key=True, index=True)
-    camera_id = Column(String, ForeignKey("cameras.camera_id"), index=True)
+    camera_id = Column(Integer, ForeignKey("cameras.camera_id"), index=True)
     detection_id = Column(Integer, ForeignKey("detections.id"), nullable=True, index=True)
     media_type = Column(String, index=True)
     path = Column(String)
