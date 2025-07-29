@@ -181,6 +181,7 @@ const StorageForm = ({
 }: StorageFormProps
 ) => {
   const form = useForm<StorageFormData>({ resolver: zodResolver(storageSchema), defaultValues: initialData });
+  console.log('StorageForm initialData:', initialData);
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(data => onSave(data))} className="space-y-8">

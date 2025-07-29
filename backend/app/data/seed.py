@@ -30,3 +30,23 @@ def seed_default_zones(db):
         zone = Zone(name="Default", description="Default system zone")
         db.add(zone)
         db.commit()
+
+def seed_detection_models(db):
+    """Seed default detection models"""
+    models = [
+        {"name": "yolo11n", "path": "models/yolo11n.pt"},
+        {"name": "yolo12n", "path": "models/yolo12n.pt"}
+    ]
+    
+    for model in models:
+        exists = db.query(InferenceSettings).filter_by(model=model["name"]).first()
+        if not exists:
+            inference_settings = InferenceSettings(
+                model=model["name"],
+                model_path=model["path"],
+                min_detection_threshold=0.5
+            )
+            db.add(inference_settings)
+    
+    db.commit()
+    print("Default detection models seeded successfully.")

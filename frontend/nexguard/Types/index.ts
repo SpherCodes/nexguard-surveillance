@@ -2,6 +2,23 @@ import { cameraFormSchema } from '@/lib/utils';
 import z from 'zod';
 
 /* eslint-disable @typescript-eslint/no-unused-vars */
+
+interface WebRTCConnection {
+  peerConnection: RTCPeerConnection | null;
+  websocket: WebSocket | null;
+  stream: MediaStream | null;
+  connectionState: 'connecting' | 'connected' | 'failed' | 'closed';
+  lastError?: Error;
+}
+
+interface WebRTCConfig {
+  stunServer: string;
+  apiUrl: string;
+  signalingPath: string;
+  connectionTimeout: number;
+  streamTimeout: number;
+  iceGatheringTimeout: number;
+}
 interface Camera {
   camera_id: string;
   name?: string;
@@ -22,7 +39,6 @@ interface SystemInfrenceSettings {
 interface SystemStorageSettings {
   storageType: 'local' | 'cloud';
   retentionDays: number;
-  updated_at?: Date;
 }
 
 interface FeedProps {
@@ -91,4 +107,6 @@ export type {
   SystemInfrenceSettings,
   SystemStorageSettings,
   StorageFormProps,
+  WebRTCConfig,
+  WebRTCConnection,
 };

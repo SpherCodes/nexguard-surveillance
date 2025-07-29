@@ -18,6 +18,7 @@ from .services.inference_engine import YOLOProcessor as InferenceEngine
 from .services.detection import DetectionEventManager 
 
 _video_capture = None
+_inference_engine = None
 
 # TODO: Remove get_database_session from dependencies.py and use the one defined in connection.py
 

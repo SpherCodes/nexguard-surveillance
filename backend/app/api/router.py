@@ -4,7 +4,6 @@ from .routes import System, webrtc_stream, cameras, inference, detections, zone
 
 api_router = APIRouter()
 
-# Include route modules  
 api_router.include_router(System.router, prefix="/system", tags=["system"])
 api_router.include_router(cameras.router, prefix="/cameras", tags=["cameras"])
 api_router.include_router(zone.router, prefix="/zones", tags=["zones"])

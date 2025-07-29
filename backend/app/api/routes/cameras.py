@@ -1,6 +1,11 @@
 """
 Camera API endpoints with validation
 """
+#TODO: Fix update endpoint camera is being updated but responds with a
+# an error code:500 when updating enabled status
+#TODO:Automatically start and stop without having to restart the server
+
+
 from typing import List, Optional
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy.orm import Session

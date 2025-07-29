@@ -17,7 +17,7 @@ router = APIRouter()
 rtc_manager = RTCSessionManager()
 
 # Add WebSocket endpoint for signaling
-@router.websocket("/webrtc/{camera_id}")
+@router.websocket("/{camera_id}")
 async def webrtc_signaling(
     websocket: WebSocket,
     camera_id: int,
@@ -38,12 +38,6 @@ async def webrtc_signaling(
             return
             
         peer_id = f"client_{websocket.client.host}_{websocket.client.port}"
-        
-        # Make sure camera is running
-        if not video_capture.is_camera_running(camera_id):
-            video_capture._start_camera_thread(camera_id)
-        if inference_engine:
-            inference_engine.start_processing([camera_id])
         
         # Handle signaling messages
         while True:

@@ -5,6 +5,11 @@ import React from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Camera } from '@/Types';
 
+//TODO:Bug: The video stream drops when the first time when trying to connect to the backend.
+//TODO: Figure how to handle video streams better,
+//the video should not drop when the user switches to a new view
+
+
 const Videocard = ({ camera }: { camera: Camera }) => {
   const videoRef = React.useRef<HTMLVideoElement>(null);
   const queryClient = useQueryClient();
