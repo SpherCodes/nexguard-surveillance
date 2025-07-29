@@ -5,7 +5,7 @@ from pathlib import Path
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.core.database import Base, engine, Camera, Detection, Media, SystemConfig
+from core.models import Base, engine, Camera, Detection, Media, SystemConfig
 
 def init_db():
     """Initialize the database with tables and default data"""

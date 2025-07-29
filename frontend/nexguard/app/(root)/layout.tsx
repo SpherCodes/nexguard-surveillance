@@ -24,5 +24,4 @@ const RootLayout = ({ children }: { children: React.ReactNode }) => {
     </Providers>
   )
 }
-
 export default RootLayout

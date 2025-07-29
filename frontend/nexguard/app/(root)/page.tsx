@@ -84,11 +84,8 @@ function Home() {
           </button>
         ))}
       </header>
-
-      {/* Main Content Area */}
       <main className="flex-1 overflow-y-none">
         {isLoading ? (
-          // <CameraGridSkeleton />
           <p className="flex items-center justify-center h-full">Loading...</p>
         ) : (
           <>

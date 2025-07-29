@@ -62,6 +62,22 @@ class VideoCapture:
         self.frame_counts[config.camera_id] = 0
         return True
     
+    def remove_camera(self, camera_id: str) -> bool:
+        """Remove a camera from monitoring."""
+        if camera_id not in self.cameras:
+            return False
+        
+        # Stop the thread if it's running
+        if camera_id in self.threads and self.threads[camera_id].is_alive():
+            self.stop_camera(camera_id)
+        
+        del self.cameras[camera_id]
+        del self.frame_buffers[camera_id]
+        del self.stop_flags[camera_id]
+        del self.frame_counts[camera_id]
+        
+        return True
+    
     def update_camera(self, config: CameraConfig) -> bool:
         """Update camera configuration."""
         if config.camera_id not in self.cameras:
@@ -119,7 +135,22 @@ class VideoCapture:
                 stream.release()
                 
         self.streams.clear()
-    
+    def stop_camera(self, camera_id: str):
+        """Stop capturing from a specific camera."""
+        if camera_id in self.threads and self.threads[camera_id].is_alive():
+            self.stop_flags[camera_id] = True
+            self.threads[camera_id].join(timeout=3.0)
+        
+        if camera_id in self.streams and self.streams[camera_id] is not None:
+            self.streams[camera_id].release()
+            self.streams[camera_id] = None
+        
+        if camera_id in self.frame_buffers:
+            del self.frame_buffers[camera_id]
+        
+        if camera_id in self.cameras:
+            del self.cameras[camera_id]
+
     def _start_camera_thread(self, camera_id: str):
         """Start a thread for capturing from a specific camera."""
         if camera_id not in self.cameras:

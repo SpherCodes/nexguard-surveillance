@@ -1,4 +1,4 @@
-from app.core.database import sessionLocal, Camera, Detection
+from core.models import sessionLocal, Camera, Detection
 
 def seed():
     db = sessionLocal()

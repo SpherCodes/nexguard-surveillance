@@ -25,10 +25,10 @@ const CameraForm = ({ initialData, onSubmit, onDelete , onCreateZone, zones = []
       name: initialData?.name || '',
       videoUrl: initialData?.videoUrl || '',
       enabled: initialData?.enabled ?? true,
-      zoneId: initialData?.zoneId ? initialData.zoneId : undefined,
+      zoneId: initialData?.zoneId || undefined,
     },
   });
-
+  
   useEffect(() => {
     form.reset({
       name: initialData?.name || '',
@@ -36,13 +36,13 @@ const CameraForm = ({ initialData, onSubmit, onDelete , onCreateZone, zones = []
       enabled: initialData?.enabled ?? true,
       zoneId: initialData?.zoneId || undefined,
     });
-  }, [initialData, form]);
+  }, [initialData, form , zones]);
 
   const handleSubmit = (data: CameraFormData) => {
     const payload = {
         ...initialData,
         ...data,
-    }
+    };
     console.log('Submitting Camera Form:', payload);
     onSubmit(payload, payload?.camera_id);
   };
@@ -51,7 +51,7 @@ const CameraForm = ({ initialData, onSubmit, onDelete , onCreateZone, zones = []
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
         {/* --- Card 1: General Information --- */}
-        <Card className="dark:bg-gray-800/50">
+        <Card>
           <CardHeader>
             <CardTitle>General Information</CardTitle>
             <CardDescription>
@@ -61,7 +61,7 @@ const CameraForm = ({ initialData, onSubmit, onDelete , onCreateZone, zones = []
           <CardContent className="space-y-4">
             <FormField control={form.control} name="name" render={({ field }) => (
               <FormItem>
-                <FormLabel>Name</FormLabel>
+                <FormLabel>Camera Name</FormLabel>
                 <FormControl><Input placeholder="Front Door Camera" {...field} /></FormControl>
                 <FormMessage />
               </FormItem>
@@ -71,7 +71,7 @@ const CameraForm = ({ initialData, onSubmit, onDelete , onCreateZone, zones = []
                 <FormLabel>Location (Zone)</FormLabel>
                 <ZoneCombobox
                   zones={zones}
-                  selectedZoneId ={field.value}
+                  selectedZoneId={field.value}
                   onChange={field.onChange}
                   onCreateZone={onCreateZone}
                 />
@@ -82,7 +82,7 @@ const CameraForm = ({ initialData, onSubmit, onDelete , onCreateZone, zones = []
         </Card>
 
         {/* --- Card 2: Connection & Status --- */}
-        <Card className="dark:bg-gray-800/50">
+        <Card>
           <CardHeader>
             <CardTitle>Connection & Status</CardTitle>
             <CardDescription>

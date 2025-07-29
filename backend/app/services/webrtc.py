@@ -9,7 +9,7 @@ import numpy as np
 from typing import Dict, Optional
 import time
 
-from ..models.FrameData import FrameData
+from ..schema.FrameData import FrameData
 
 class CameraStreamTrack(VideoStreamTrack):
     """A video stream track that captures frames from the inference engine"""

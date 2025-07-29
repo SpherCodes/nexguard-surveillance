@@ -11,8 +11,9 @@ import cv2
 import numpy as np
 from sqlalchemy.orm import Session
 
-from ..models.FrameData import FrameData
-from ..core.database import Detection, Media, sessionLocal
+from ..schema.FrameData import FrameData
+from ..core.models import Detection, Media
+from ..core.database.connection import SessionLocal
 
 class DetectionEvent:
     """Represents a detection event"""

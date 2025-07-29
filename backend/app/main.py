@@ -6,44 +6,31 @@ from contextlib import asynccontextmanager
 import uvicorn
 from pathlib import Path
 
+from .core.database.connection import Base, engine, SessionLocal, create_tables
+from .core.models import Camera
+from .services.camera_service import camera_service
+from .Settings import settings
+from .data.seed import seed_default_settings, seed_default_zones
 from .dependencies import get_video_capture
-
-from .core.database import Base, engine, sessionLocal, Camera
 from .services.video_capture import CameraConfig, VideoCapture
 from .api.router import api_router
 
-
 video_capture = get_video_capture()
-
-def setup_directories():
-    """Create necessary directories for the application"""
-    base_dir = Path("data")
-    storage_dir = base_dir / "storage"
-    database_dir = base_dir / "database"
-
-    base_dir.mkdir(exist_ok=True)
-    storage_dir.mkdir(exist_ok=True)
-    database_dir.mkdir(exist_ok=True)
-
-    (storage_dir / "images").mkdir(parents=True, exist_ok=True)
-    (storage_dir / "videos").mkdir(parents=True, exist_ok=True)
-    (storage_dir / "thumbnails").mkdir(parents=True, exist_ok=True)
-
-    print("📁 Directory structure created successfully!")
 
 
 def setup_database():
     """Initialize and migrate database if missing"""
     try:
-        db_dir = Path("data/database")
-        db_dir.mkdir(parents=True, exist_ok=True)
-        db_path = db_dir / "nexguard.db"
+        # Use settings from config
+        settings.DATA_DIR.mkdir(parents=True, exist_ok=True)
+        db_path = settings.DATA_DIR / "nexguard.db"
 
         if not db_path.exists():
             print("📦 Database file not found. Applying migrations...")
 
             alembic_cfg = Config(str(Path(__file__).parent / "alembic.ini"))
             alembic_cfg.set_main_option("script_location", str(Path(__file__).parent / "alembic"))
+            alembic_cfg.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
             command.upgrade(alembic_cfg, "head")
 
             print("✅ Migrations applied")
@@ -57,34 +44,40 @@ def setup_database():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("Starting NexGuard API...")
-
-    setup_directories()
+    
+    # Setup database using new structure
     setup_database()
-    Base.metadata.create_all(bind=engine)
-    print("✅ Database tables created successfully")
-
+    create_tables()  # Using the new database module
+    
+    # Use the new database session management
+    db = SessionLocal()
     try:
-        db = sessionLocal()
-        cameras = db.query(Camera).all()
-        print(f"🎥 Starting {len(cameras)} camera(s)...")
+        seed_default_settings(db)
+        seed_default_zones(db)
+        print("✅ Database tables created successfully")
+
+        # Get cameras using the service layer
+        cameras = camera_service.get_active_cameras(db)
+        print(f"🎥 Starting {len(cameras)} active camera(s)...")
 
         for camera in cameras:
-            if camera.enabled:
-                # ✅ Create CameraConfig instance
-                config = CameraConfig(
-                    camera_id=camera.camera_id,
-                    url=camera.url,
-                    fps_target=camera.fps_target,
-                    resolution=(camera.resolution_width, camera.resolution_height),
-                    enabled=camera.enabled,
-                    location=camera.location
-                )
+            # Create CameraConfig instance
+            config = CameraConfig(
+                camera_id=camera.id,
+                url=camera.url,
+                fps_target=camera.fps_target,
+                resolution=(camera.resolution_width, camera.resolution_height),
+                enabled=camera.enabled,
+                location=camera.location
+            )
 
-                added = video_capture.add_camera(config)
-                if added:
-                    print(f"✅ Camera {camera.camera_id} configured")
-                else:
-                    print(f"⚠️ Camera {camera.camera_id} already exists")
+            added = video_capture.add_camera(config)
+            if added:
+                print(f"✅ Camera {camera.id} configured")
+                # Update last_active timestamp
+                camera_service.update_last_active(db, camera.id)
+            else:
+                print(f"⚠️ Camera {camera.id} already exists")
 
         # Start all enabled cameras
         video_capture.start_all_cameras()
@@ -92,10 +85,12 @@ async def lifespan(app: FastAPI):
 
     except Exception as e:
         print(f"❌ Failed to initialize cameras: {e}")
+        raise
     finally:
         db.close()
 
     yield
+    
     print("🛑 Shutting down NexGuard API...")
     video_capture.stop_all_cameras()
 
@@ -127,7 +122,11 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy"}
+    return {
+        "status": "healthy",
+        "database_url": settings.DATABASE_URL,
+        "debug_mode": settings.DEBUG
+    }
 
 
 if __name__ == "__main__":
@@ -135,5 +134,5 @@ if __name__ == "__main__":
         "main:app",
         host="0.0.0.0",
         port=8000,
-        reload=True,
+        reload=settings.DEBUG,
     )

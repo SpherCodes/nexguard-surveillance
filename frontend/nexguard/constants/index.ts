@@ -2,6 +2,9 @@ import {
   Home,
   Video,
   Settings,
+  Brain,
+  Database,
+  Shield,
 } from 'lucide-react';
 
 export const SidebarLinks = [
@@ -31,10 +34,6 @@ export const SettingsTabList = [
     label: 'Cameras',
   },
   {
-    value: 'Inference',
-    label: 'Inference',
-  },
-  {
     value: 'System',
     label: 'System',
   },
@@ -43,3 +42,9 @@ export const SettingsTabList = [
     label: 'General',
   }
 ]
+
+ export const systemSettingsNav = [
+  { id: 'inference', label: 'Inference', icon: Brain },
+  { id: 'storage', label: 'Storage', icon: Database },
+  { id: 'access', label: 'Access Control', icon: Shield },
+];

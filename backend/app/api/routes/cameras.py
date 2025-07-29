@@ -1,230 +1,265 @@
-from fastapi import APIRouter, Depends, HTTPException, Path
-from typing import List, Tuple
-from pydantic import BaseModel, HttpUrl, field_validator
-from requests import Session
+"""
+Camera API endpoints with validation
+"""
+from typing import List, Optional
+from fastapi import APIRouter, HTTPException, status
+from sqlalchemy.orm import Session
 
-from ...core.database import Camera, Zone
-
-from ...dependencies import get_db, get_video_capture
-from ...services.video_capture import CameraConfig, VideoCapture as video_capture
+from ...schema import (
+    Camera, CameraCreate, CameraUpdate, CameraWithRelations
+)
+from ...dependencies import DatabaseDep, CameraServiceDep, VideoCaptureServiceDep
+from ...services.video_capture import CameraConfig
 
 router = APIRouter()
 
-class CameraConfigRequest(BaseModel):
-    name: str = "Default"
-    url: str
-    enabled: bool = False
-    location: str = "Unknown"
-    zoneId: int = 0
 
-    # @field_validator("url")
-    # @classmethod
-    # def url_must_not_be_empty(cls, v: str) -> str:
-    #     if not v.strip():
-    #         raise ValueError("Camera URL must not be empty")
-    #     return v
-class CameraStatusResponse(BaseModel):
-    name:str
-    camera_id: int
-    enabled: bool
-    location: str = "Unknown"
-    zoneId: int = 0
-
-@router.get("/", response_model=List[CameraStatusResponse])
-async def list_cameras( 
-        video_capture: video_capture =  Depends(get_video_capture),
-        db:Session = Depends(get_db)
-    ):
-    """Get list of all cameras and their status"""
-    try:
-        cameras = db.query(Camera).all()
-        if not cameras:
-            return []
-        
-        response = []
-        for cam in cameras:
-            response.append(CameraStatusResponse(
-                name=cam.name,
-                camera_id=cam.camera_id,
-                enabled=cam.enabled,
-                location=cam.location,
-                zoneId=cam.zone_id if cam.zone_id is not None else 0
-            ))
-        return response
-    except Exception as e:
-        print(f"Error listing cameras: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal server error")
-
-@router.post("/add")
-async def add_camera(
-    camera_config: CameraConfigRequest, 
-    video_capture: video_capture = Depends(get_video_capture),
-    db: Session = Depends(get_db)
+@router.get("/", response_model=List[Camera])
+async def get_cameras(
+    db: DatabaseDep,
+    camera_service: CameraServiceDep,
+    skip: int = 0,
+    limit: int = 100,
+    zone_id: Optional[int] = None,
+    enabled_only: bool = False
 ):
-    """Add a new camera to the system"""
+    """Get all cameras with optional filtering"""
     try:
-        # Add to database
-        db_camera = Camera(
-            name = camera_config.name,
-            url=camera_config.url,
-            enabled=camera_config.enabled,
-            location=camera_config.location,
-            zone_id=camera_config.zoneId if camera_config.zoneId is not None else 0
-        )
-
-
-        db.add(db_camera)
-        db.commit()
-        db.refresh(db_camera)
+        if zone_id:
+            cameras = camera_service.get_by_zone(db, zone_id)
+        elif enabled_only:
+            cameras = camera_service.get_active_cameras(db)
+        else:
+            cameras = camera_service.get_multi(db, skip=skip, limit=limit)
         
-        camera = db.query(Camera).order_by(Camera.camera_id.desc()).first()
-        
-        config = CameraConfig(
-            camera_id=camera.camera_id,
-            url=camera.url,
-            enabled=camera.enabled,
-            location=camera.location,
-        )
-        
-        # Add to video capture service
-        video_capture.add_camera(config)
-        
-        
-        return {"message": f"Camera added successfully"}
+        return cameras
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve cameras: {str(e)}"
+        )
 
-@router.put("/update/{id}")
+
+@router.get("/{camera_id}", response_model=CameraWithRelations)
+async def get_camera(
+    camera_id: int,
+    db: DatabaseDep,
+    camera_service: CameraServiceDep
+):
+    """Get a specific camera by ID"""
+    camera = camera_service.get_by_camera_id(db, camera_id)
+    if not camera:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Camera with ID {camera_id} not found"
+        )
+    return camera
+
+
+@router.post("/", response_model=Camera, status_code=status.HTTP_201_CREATED)
+async def create_camera(
+    camera_data: CameraCreate,
+    db: DatabaseDep,
+    camera_service: CameraServiceDep,
+    video_capture: VideoCaptureServiceDep
+):
+    """Create a new camera with validation"""
+    try:
+        camera = camera_service.create_camera(db, camera_data)
+        if camera.enabled:
+            config = CameraConfig(
+                camera_id=camera.id,
+                url=camera.url,
+                fps_target=camera.fps_target,
+                resolution=(camera.resolution_width, camera.resolution_height),
+                enabled=camera.enabled,
+                location=camera.location
+            )
+            if video_capture:
+                video_capture.add_camera(config)
+        return camera
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create camera: {str(e)}"
+        )
+
+
+@router.put("/{camera_id}", response_model=Camera)
 async def update_camera(
-    id: int = Path(..., description="Camera ID"),
-    camera_config: CameraConfigRequest = ...,
-    video_capture: video_capture = Depends(get_video_capture),
-    db: Session = Depends(get_db)
+    camera_id: int,
+    camera_data: CameraUpdate,
+    db: DatabaseDep,
+    camera_service: CameraServiceDep,
+    video_capture: VideoCaptureServiceDep
 ):
-    """Update an existing camera"""
+    """Update a camera with validation"""
     try:
-        print(f"Updating camera {id} with config: {camera_config}")
-        # Find existing camera
-        existing_camera = db.query(Camera).filter(Camera.camera_id == id).first()
-        if not existing_camera:
-            raise HTTPException(status_code=404, detail="Camera not found")
-        
-        # Update database record
-        existing_camera.name = camera_config.name
-        existing_camera.url = camera_config.url
-        existing_camera.enabled = camera_config.enabled
-        existing_camera.location = camera_config.location
-        existing_camera.zone_id = camera_config.zoneId if camera_config.zoneId is not None else 0
-
-        db.commit()
-        
-        # Update in video capture service
-        video_capture.update_camera(existing_camera)
-        
-        return {"message": "Camera updated successfully"}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-@router.post("/{camera_id}/start", operation_id="start_camera_unique")
-async def start_camera(
-    camera_id: str, 
-    video_capture: video_capture = Depends(get_video_capture)
-):
-    """Start a specific camera"""
-    
-    try:
-        # Check if camera exists first
-        # if camera_id not in video_capture.cameras:
-        #     raise HTTPException(
-        #         status_code=404, 
-        #         detail=f"Camera {camera_id} not found"
-        #     )
+        updated_camera = camera_service.update_camera(db, camera_id, camera_data)
+        if not updated_camera:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Camera with ID {camera_id} not found"
+            )
             
-        # Start the camera
-        video_capture._start_camera_thread(camera_id)
-        return {"message": f"Camera {camera_id} started successfully"}
+        if any([
+            camera_data.url is not None,
+            camera_data.fps_target is not None,
+            camera_data.resolution_width is not None,
+            camera_data.resolution_height is not None,
+            camera_data.enabled is not None
+        ]):
+            # Stop existing camera
+            video_capture.stop_camera(camera_id)
+            video_capture.remove_camera(camera_id)
+            
+            # Add updated camera if enabled
+            if updated_camera.enabled:
+                config = CameraConfig(
+                    camera_id=updated_camera.camera_id,
+                    url=updated_camera.url,
+                    fps_target=updated_camera.fps_target,
+                    resolution=(updated_camera.resolution_width, updated_camera.resolution_height),
+                    enabled=updated_camera.enabled,
+                    location=updated_camera.location
+                )
+                
+                video_capture.add_camera(config)
+                video_capture.start_camera(camera_id)
+        
+        return updated_camera
         
     except ValueError as e:
-        # For specific validation errors
-        raise HTTPException(status_code=400, detail=str(e))
-    except ConnectionError as e:
-        # For connection issues
         raise HTTPException(
-            status_code=503, 
-            detail=f"Failed to connect to camera {camera_id}: {str(e)}"
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
         )
     except Exception as e:
-        # Log the unexpected error
-        print(f"Unexpected error when starting camera {camera_id}: {str(e)}")
         raise HTTPException(
-            status_code=500, 
-            detail=f"Internal server error when starting camera {camera_id}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update camera: {str(e)}"
         )
 
-@router.post("/{camera_id}/stop")
-async def stop_camera(
-    camera_id: str,
-    video_capture: video_capture = Depends(get_video_capture)
+
+@router.delete("/{camera_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_camera(
+    camera_id: int,
+    db: DatabaseDep,
+    camera_service: CameraServiceDep,
+    video_capture: VideoCaptureServiceDep
 ):
-    """Stop a specific camera"""
+    """Delete a camera"""
+    camera = camera_service.get_by_camera_id(db, camera_id)
+    if not camera:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Camera with ID {camera_id} not found"
+        )
+    
     try:
+        video_capture.remove_camera(camera_id)
+        camera_service.delete(db, camera)
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete camera: {str(e)}"
+        )
+
+
+@router.post("/{camera_id}/enable", response_model=Camera)
+async def enable_camera(
+    camera_id: int,
+    db: DatabaseDep,
+    camera_service: CameraServiceDep,
+    video_capture: VideoCaptureServiceDep
+):
+    """Enable a camera"""
+    camera = camera_service.enable_camera(db, camera_id)
+    if not camera:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Camera with ID {camera_id} not found"
+        )
+    
+    try:
+        # Start video capture
+        if not video_capture.is_camera_active(camera_id):
+            config = CameraConfig(
+                camera_id=camera.camera_id,
+                url=camera.url,
+                fps_target=camera.fps_target,
+                resolution=(camera.resolution_width, camera.resolution_height),
+                enabled=camera.enabled,
+                location=camera.location
+            )
+            video_capture.add_camera(config)
+        
+        video_capture.start_camera(camera_id)
+        return camera
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to enable camera: {str(e)}"
+        )
+
+
+@router.post("/{camera_id}/disable", response_model=Camera)
+async def disable_camera(
+    camera_id: int,
+    db: DatabaseDep,
+    camera_service: CameraServiceDep,
+    video_capture: VideoCaptureServiceDep
+):
+    """Disable a camera"""
+    camera = camera_service.disable_camera(db, camera_id)
+    if not camera:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Camera with ID {camera_id} not found"
+        )
+    
+    try:
+        # Stop video capture
         video_capture.stop_camera(camera_id)
-        return {"message": f"Camera {camera_id} stopped successfully"}
+        return camera
+        
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to disable camera: {str(e)}"
+        )
 
-@router.delete("/{camera_id}")
-async def remove_camera(
-    camera_id: str,
-    video_capture: video_capture = Depends(get_video_capture),
-    db: Session = Depends(get_db)
-):
-    """Remove a camera from the system"""
-    try:
-        # Check if camera exists in DB
-        existing = db.query(Camera).filter(Camera.camera_id == camera_id).first()
-        if not existing:
-            raise HTTPException(status_code=404, detail=f"Camera {camera_id} not found")
-        
-        # Stop the camera if it's running
-        # video_capture.stop_camera(camera_id)
-        
-        # Remove from video capture service
-        # video_capture.remove_camera(camera_id)
-        
-        # Remove from database
-        db.delete(existing)
-        db.commit()
-        
-        return {"message": f"Camera {camera_id} removed successfully"}
-    except Exception as e:
-        print(f"Error removing camera {camera_id}: {str(e)}")
-        raise HTTPException(status_code=400, detail=str(e))
 
-#Zone Management endpoints
-@router.get("/zones")
-async def list_zones(
-    db: Session = Depends(get_db)
+@router.get("/{camera_id}/status")
+async def get_camera_status(
+    camera_id: int,
+    db: DatabaseDep,
+    camera_service: CameraServiceDep,
+    video_capture: VideoCaptureServiceDep
 ):
-    """Get list of all zones"""
-    zones = db.query(Zone).all()
-    return zones
-
-@router.post("/zones/add/{zone_name}")
-async def add_zone(
-    zone_name: str,
-    db: Session = Depends(get_db)
-):
-    """Add a new zone"""
-    try:
-        existing = db.query(Zone).filter(Zone.name == zone_name).first()
-        if existing:
-            raise HTTPException(status_code=400, detail=f"Zone {zone_name} already exists")
-        
-        new_zone = Zone(name=zone_name)
-        db.add(new_zone)
-        db.commit()
-        
-        return {"message": f"Zone {zone_name} added successfully"}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    """Get camera status including video capture state"""
+    camera = camera_service.get_by_camera_id(db, camera_id)
+    if not camera:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Camera with ID {camera_id} not found"
+        )
+    
+    video_active = video_capture.is_camera_active(camera_id)
+    
+    return {
+        "camera_id": camera.camera_id,
+        "name": camera.name,
+        "enabled": camera.enabled,
+        "video_active": video_active,
+        "last_active": camera.last_active,
+        "url": camera.url,
+        "location": camera.location
+    }

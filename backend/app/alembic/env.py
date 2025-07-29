@@ -14,7 +14,7 @@ load_dotenv()
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 # Import your models
-from core.database import Base
+from core.models import Base
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 import time
 from sqlalchemy.orm import Session
 
-from ...core.database import Detection, Media
+from ...core.models import Detection, Media
 from ...services.detection import DetectionEventManager
 from ...dependencies import get_detection_event_manager, get_db
 

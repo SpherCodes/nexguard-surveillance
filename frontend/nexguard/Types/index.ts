@@ -1,8 +1,8 @@
-import { cameraFormSchema } from "@/lib/utils";
-import z from "zod";
+import { cameraFormSchema } from '@/lib/utils';
+import z from 'zod';
 
 /* eslint-disable @typescript-eslint/no-unused-vars */
-declare interface Camera {
+interface Camera {
   camera_id: string;
   name?: string;
   location?: string;
@@ -14,12 +14,22 @@ declare interface Camera {
   zoneId?: number;
 }
 
+interface SystemInfrenceSettings {
+  model: string;
+  min_detection_threshold: number;
+}
 
-declare interface FeedProps{
+interface SystemStorageSettings {
+  storageType: 'local' | 'cloud';
+  retentionDays: number;
+  updated_at?: Date;
+}
+
+interface FeedProps {
   alertEvent: DetectionEvent;
 }
 
-declare type DetectionEvent =  {
+type DetectionEvent = {
   id: string;
   cameraId: string;
   type: string;
@@ -28,7 +38,7 @@ declare type DetectionEvent =  {
   thumbnailImg: string;
   confidence: GLfloat;
   thumbnail?: string;
-}
+};
 
 declare interface Zone {
   id: number;
@@ -45,4 +55,40 @@ interface CameraFormProps {
   onCreateZone: (zoneName: string) => Promise<Zone>;
 }
 
-export { type Camera, type CameraFormData, type CameraFormProps , type FeedProps, type DetectionEvent, type Zone };
+interface InfrenceFormProps {
+  initialData: SystemInfrenceSettings;
+  onSave: (data: SystemInfrenceSettings) => void;
+  isLoading?: boolean;
+}
+
+interface StorageFormProps {
+  initialData: SystemStorageSettings;
+  onSave: (data: SystemStorageSettings) => void;
+  isLoading?: boolean;
+}
+
+interface UserFormProps {
+  initialData?: {
+    username: string;
+    role: 'admin' | 'user';
+  };
+  onSave: (data: { username: string; role: 'admin' | 'user' }) => void;
+}
+
+interface CameraSettingsProps {
+  cameras: Camera[];
+}
+
+export type {
+  Camera,
+  CameraFormData,
+  CameraFormProps,
+  InfrenceFormProps,
+  FeedProps,
+  DetectionEvent,
+  Zone,
+  CameraSettingsProps,
+  SystemInfrenceSettings,
+  SystemStorageSettings,
+  StorageFormProps,
+};

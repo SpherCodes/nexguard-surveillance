@@ -1,46 +1,67 @@
+"""
+FastAPI dependencies with database integration
+"""
 from functools import lru_cache
+from typing import Generator, Annotated
+from webbrowser import get
+from fastapi import Depends
+from sqlalchemy.orm import Session
 
-from .services.detection import DetectionEventManager
+
+
+from .core.database.connection import get_db, SessionLocal
+from .services.camera_service import camera_service
+from .services.zone_service import zone_service
+from .services.detection_service import detection_service
 from .services.video_capture import VideoCapture
 from .services.inference_engine import YOLOProcessor as InferenceEngine
-from .config import settings
-from .core.database import sessionLocal
+from .services.detection import DetectionEventManager 
 
-_video_capture_instance = None
-_inference_engine_instance = None
+_video_capture = None
+
+# TODO: Remove get_database_session from dependencies.py and use the one defined in connection.py
 
 def get_video_capture() -> VideoCapture:
-    global _video_capture_instance
-    if _video_capture_instance is None:
-        _video_capture_instance = VideoCapture()
-    return _video_capture_instance
+    """Get or create video capture singleton"""
+    global _video_capture
+    if _video_capture is None:
+        _video_capture = VideoCapture()
+    return _video_capture
 
 def get_inference_engine() -> InferenceEngine:
-    global _inference_engine_instance
-    if _inference_engine_instance is None:
-        # Get the detection event manager instance
-        detection_manager = get_detection_event_manager()
-        
-        _inference_engine_instance = InferenceEngine(
-            model_path=settings.DEFAULT_MODEL_PATH,
-            conf_threshold=settings.CONFIDENCE_THRESHOLD,
-            detection_manager=detection_manager
-        )
-        
-        # Connect video capture
-        video_capture = get_video_capture()
-        _inference_engine_instance.connect_video_capture(video_capture)
-    return _inference_engine_instance
+    """Get or create inference engine singleton"""
+    global _inference_engine
+    if _inference_engine is None:
+        _inference_engine = InferenceEngine()
+    return _inference_engine
+
+def get_database_session() -> Generator[Session, None, None]:
+    """Get database session for FastAPI dependency injection"""
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+def get_camera_service():
+    """Get camera service instance"""
+    return camera_service
+
+def get_zone_service():
+    """Get zone service instance"""
+    return zone_service
+
+def get_detection_service():
+    """Get detection service instance"""
+    return detection_service
 
 @lru_cache()
 def get_detection_event_manager() -> DetectionEventManager:
     """Single instance for all cameras"""
     return DetectionEventManager()
 
-def get_db():
-    """Dependency to get a database session"""
-    db = sessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+DatabaseDep = Annotated[Session, Depends(get_database_session)]
+CameraServiceDep = Annotated[object, Depends(get_camera_service)]
+ZoneServiceDep = Annotated[object, Depends(get_zone_service)]
+DetectionServiceDep = Annotated[object, Depends(get_detection_service)]
+VideoCaptureServiceDep = Annotated[VideoCapture, Depends(get_video_capture)]
