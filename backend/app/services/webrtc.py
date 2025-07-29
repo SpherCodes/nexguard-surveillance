@@ -9,7 +9,7 @@ import numpy as np
 from typing import Dict, Optional
 import time
 
-from ..models.FrameData import FrameData
+from ..schema.FrameData import FrameData
 
 class CameraStreamTrack(VideoStreamTrack):
     """A video stream track that captures frames from the inference engine"""
@@ -201,18 +201,18 @@ class RTCSessionManager:
             configuration = RTCConfiguration(iceServers=ice_servers)
             pc = RTCPeerConnection(configuration=configuration)
             self.peer_connections[camera_id][peer_id] = pc
-            # Use inference_engine for annotated frames
+            
             track = CameraStreamTrack(camera_id, inference_engine, video_capture)
             self.tracks[camera_id][peer_id] = track
             pc.addTrack(track)
-            @pc.on("connectionstatechange")
-            async def on_connectionstatechange():
-                if pc.connectionState == "failed":
-                    await self.close_peer_connection(camera_id, peer_id)
-            @pc.on("iceconnectionstatechange")
-            async def on_iceconnectionstatechange():
-                if pc.iceConnectionState == "failed":
-                    await self.close_peer_connection(camera_id, peer_id)
+            # @pc.on("connectionstatechange")
+            # async def on_connectionstatechange():
+            #     if pc.connectionState == "failed":
+            #         await self.close_peer_connection(camera_id, peer_id)
+            # @pc.on("iceconnectionstatechange")
+            # async def on_iceconnectionstatechange():
+            #     if pc.iceConnectionState == "failed":
+            #         await self.close_peer_connection(camera_id, peer_id)
             offer = RTCSessionDescription(sdp=offer_sdp, type="offer")
             await pc.setRemoteDescription(offer)
             answer = await pc.createAnswer()
@@ -229,7 +229,6 @@ class RTCSessionManager:
                 peer_id in self.peer_connections[camera_id]):
                 pc = self.peer_connections[camera_id][peer_id]
                 await pc.addIceCandidate(candidate)
-                print(f"Added ICE candidate for {camera_id}/{peer_id}")
         except Exception as e:
             print(f"Error adding ICE candidate: {e}")
     

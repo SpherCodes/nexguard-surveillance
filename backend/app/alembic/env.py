@@ -4,16 +4,28 @@ from sqlalchemy import pool
 from alembic import context
 import sys
 from pathlib import Path
+import os
+
+from dotenv import load_dotenv
+load_dotenv()
+
 
 # Add the parent directory to the path so we can import our models
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 # Import your models
-from core.database import Base
+from core.models import Base
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
+
+#Load the database url from env
+db_url = os.getenv("DATABASE_URL")
+if db_url:
+    config.set_main_option("sqlalchemy.url", db_url)
+else:    
+    raise ValueError("DATABASE_URL environment variable is not set. Please set it to your database connection string.")
 
 # Interpret the config file for Python logging.
 if config.config_file_name is not None:

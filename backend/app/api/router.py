@@ -1,12 +1,12 @@
 from fastapi import APIRouter
 
-from .routes import webrtc_stream, health, cameras, inference, detections
+from .routes import System, webrtc_stream, cameras, inference, detections, zone
 
 api_router = APIRouter()
 
-# Include route modules  
-api_router.include_router(health.router, prefix="/health", tags=["health"])
-api_router.include_router(cameras.router, prefix="/cameras", tags=["cameras"])  
-api_router.include_router(webrtc_stream.router, prefix="/cameras", tags=["webrtc"])
+api_router.include_router(System.router, prefix="/system", tags=["system"])
+api_router.include_router(cameras.router, prefix="/cameras", tags=["cameras"])
+api_router.include_router(zone.router, prefix="/zones", tags=["zones"])
+api_router.include_router(webrtc_stream.router, prefix="/webrtc", tags=["webrtc"])
 api_router.include_router(inference.router, prefix="/inference", tags=["inference"])
 api_router.include_router(detections.router, prefix="/detections", tags=["detections"])

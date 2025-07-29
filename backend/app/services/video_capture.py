@@ -21,6 +21,8 @@ class CameraConfig:
     resolution: Tuple[int, int] = (1280, 720)  # (width, height)
     buffer_size: int = 10  # Number of frames to keep in buffer
     enabled: bool = True
+    location: str = "Unknown"
+    zone_id: int = 0  # Zone ID for camera grouping
 
 
 class FrameData:
@@ -33,7 +35,7 @@ class FrameData:
         self.timestamp = timestamp
         self.frame_number = frame_number
         self.resolution = resolution
-        self.detections = []  # Will be populated by the AI module
+        self.detections = []
         self.processed = False
 
 
@@ -41,7 +43,7 @@ class VideoCapture:
     """Handles video capture from multiple sources."""
     
     def __init__(self):
-        self.cameras: Dict[str, CameraConfig] = {}
+        self.cameras: Dict[int, CameraConfig] = {}
         self.streams: Dict[str, Any] = {}
         self.frame_buffers: Dict[str, queue.Queue] = {}
         self.stop_flags: Dict[str, bool] = {}
@@ -49,35 +51,31 @@ class VideoCapture:
         self.last_frame_time: Dict[str, float] = {}
         self.frame_counts: Dict[str, int] = {}
         
-        # Add default test cameras
-        self.add_camera(CameraConfig(
-            camera_id="0",
-            url="0",  # First webcam
-            fps_target=15,
-            resolution=(640, 480),
-            buffer_size=10,
-            enabled=True
-        ))
-        
-        self.add_camera(CameraConfig(
-            camera_id="1",
-            url="1",  # Second webcam
-            fps_target=15,
-            resolution=(640, 480),
-            buffer_size=10,
-            enabled=True
-        ))
-        
     def add_camera(self, config: CameraConfig) -> bool:
         """Add a camera to be monitored."""
         if config.camera_id in self.cameras:
-            print(f"Camera {config.camera_id} already exists. Use update_camera instead.")
             return False
         
         self.cameras[config.camera_id] = config
         self.frame_buffers[config.camera_id] = queue.Queue(maxsize=config.buffer_size)
         self.stop_flags[config.camera_id] = False
         self.frame_counts[config.camera_id] = 0
+        return True
+    
+    def remove_camera(self, camera_id: str) -> bool:
+        """Remove a camera from monitoring."""
+        if camera_id not in self.cameras:
+            return False
+        
+        # Stop the thread if it's running
+        if camera_id in self.threads and self.threads[camera_id].is_alive():
+            self.stop_camera(camera_id)
+        
+        del self.cameras[camera_id]
+        del self.frame_buffers[camera_id]
+        del self.stop_flags[camera_id]
+        del self.frame_counts[camera_id]
+        
         return True
     
     def update_camera(self, config: CameraConfig) -> bool:
@@ -116,6 +114,8 @@ class VideoCapture:
     def start_all_cameras(self):
         """Start capturing from all enabled cameras."""
         for camera_id, config in self.cameras.items():
+            print(f"Starting camera {camera_id} with URL {config}")
+            print(f"Available cameras: {self.cameras.keys()}")
             if config.enabled and (camera_id not in self.threads or not self.threads[camera_id].is_alive()):
                 self._start_camera_thread(camera_id)
     
@@ -135,7 +135,22 @@ class VideoCapture:
                 stream.release()
                 
         self.streams.clear()
-    
+    def stop_camera(self, camera_id: str):
+        """Stop capturing from a specific camera."""
+        if camera_id in self.threads and self.threads[camera_id].is_alive():
+            self.stop_flags[camera_id] = True
+            self.threads[camera_id].join(timeout=3.0)
+        
+        if camera_id in self.streams and self.streams[camera_id] is not None:
+            self.streams[camera_id].release()
+            self.streams[camera_id] = None
+        
+        if camera_id in self.frame_buffers:
+            del self.frame_buffers[camera_id]
+        
+        if camera_id in self.cameras:
+            del self.cameras[camera_id]
+
     def _start_camera_thread(self, camera_id: str):
         """Start a thread for capturing from a specific camera."""
         if camera_id not in self.cameras:
@@ -180,7 +195,7 @@ class VideoCapture:
                 
             
             if not stream.isOpened():
-                print(f"Failed to open {config.url} after retries")
+                print(f"Failed to open {config.camera_id} after retries")
                 return
         
             time.sleep(1.0)
@@ -354,3 +369,5 @@ class VideoCapture:
         
         # Assuming self.threads contains the active camera threads
         return (camera_id in self.threads and self.threads[camera_id].is_alive())
+    
+video_capture  = VideoCapture()
