@@ -20,7 +20,7 @@ interface WebRTCConfig {
   iceGatheringTimeout: number;
 }
 interface Camera {
-  camera_id: string;
+  cameraId: number;
   name?: string;
   location?: string;
   status: 'online' | 'offline' | 'recording';

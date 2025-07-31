@@ -1,12 +1,14 @@
 import { Wifi, MoreHorizontal } from 'lucide-react'
-import { connectToWebRtcStream } from '@/lib/services/webrtc';
+import { connectToWebRtcStream } from '@/lib/services/webrtc_service';
 import { useEffect } from 'react';
 import React from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Camera } from '@/Types';
+import { webRTCManager } from '@/lib/services/webrtc_manager';
 
 //TODO:Bug: The video stream drops when the first time when trying to connect to the backend.
 //TODO: Figure how to handle video streams better,
+//TODO: Change camera_id -> CameraId in the Camera interface
 //the video should not drop when the user switches to a new view
 
 
@@ -24,120 +26,46 @@ const Videocard = ({ camera }: { camera: Camera }) => {
 
 useEffect(() => {
     const videoElement = videoRef.current;
+    let isCancelled = false;
 
-    if (!camera) {
-      console.error('No camera object provided');
-      return;
-    }
+    const init = async () => {
+      console.log(`Initializing video stream for camera ${camera.cameraId}`);
+      if(!camera.enabled || !camera.cameraId) return;
+      try{
+        const stream = await webRTCManager.getStream(camera.cameraId);
+        if(!stream || isCancelled) return;
 
-    if (!camera.camera_id) {
-      console.error('Camera ID is missing or empty:', camera);
-      return;
-    }
-
-    // Only attempt to connect if camera is enabled and not offline
-    if (camera.enabled) {
-      let connectionAttempts = 0;
-      const maxConnectionAttempts = 3;
-      let connectionTimer: NodeJS.Timeout;
-      
-      const initWebRTC = async () => {
-        try {
-          
-          // Clear any existing connection timer
-          if (connectionTimer) clearTimeout(connectionTimer);
-          
-          // Set a connection timeout
-          connectionTimer = setTimeout(() => {
-            console.error(`Connection timeout for camera ${camera.camera_id}`);
-          }, 15000); // 15 seconds timeout
-          
-          // Convert camera.camera_id to string if it's not already
-          const cameraId = String(camera.camera_id);
-          const mediaStream = await connectToWebRtcStream(cameraId);
-
-          clearTimeout(connectionTimer);
-          
-          if (!mediaStream) {
-            throw new Error('No media stream received');
-          }
-          
-          // Check if the stream has tracks
-          if (mediaStream.getTracks().length === 0) {
-            console.warn('Media stream has no tracks');
-            // Wait a bit to see if tracks arrive late
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            if (mediaStream.getTracks().length === 0) {
-              throw new Error('Media stream has no tracks after waiting');
-            }
-          }
-
-          if (videoRef.current) {
-            // Make sure to directly set the srcObject
-            videoRef.current.srcObject = mediaStream;
-            
-            // Add event listeners to confirm video is playing
-            videoRef.current.onloadedmetadata = () => {
-              videoRef.current?.play()
-                .then(() => {
-                  if (camera.status !== 'online') {
-                  updateCameraStatusInCache(camera.camera_id, 'online');
-                    console.log(`Camera is now online:`, JSON.stringify(camera, null, 2));
+        if(videoElement){
+          videoElement.srcObject = stream;
+          videoElement.onloadedmetadata = () => {
+            videoElement.play()
+              .then(() => updateCameraStatusInCache(camera.cameraId, 'online'))
+              .catch(() => {
+                if (camera.status !== 'offline') {
+                  updateCameraStatusInCache(camera.cameraId, 'offline');
                 }
-                })
-                .catch(() => {
-                  if (camera.status !== 'offline') {
-                    updateCameraStatusInCache(camera.camera_id, 'offline');
-                  }
-                });
-            };
-            
-            videoRef.current.onerror = (err) => {
-              if (camera.status !== 'offline') {
-                  updateCameraStatusInCache(camera.camera_id, 'offline');
-                }
-              console.error("Video element error:", err);
-            };
-          } else {
-            throw new Error('Video reference is not available');
-          }
-        } catch (error) {
-          console.error('Error connecting to WebRTC stream:', error);
-          clearTimeout(connectionTimer);
-          
-          // Try reconnecting if we haven't reached max attempts
-          if (connectionAttempts < maxConnectionAttempts) {
-            connectionAttempts++;
-            console.log(`Retrying connection (${connectionAttempts}/${maxConnectionAttempts})`);
-            setTimeout(initWebRTC, 3000); // Wait 3 seconds before retry
+              });
           }
         }
-      };
-      
-      initWebRTC();
-      
-      // Cleanup function
-      return () => {
-        if (connectionTimer) clearTimeout(connectionTimer);
-        
-        if (videoElement && videoElement.srcObject) {
-          const mediaStream = videoElement.srcObject as MediaStream;
-          mediaStream.getTracks().forEach(track => {
-            track.stop();
-            console.log(`Stopped track: ${track.kind}`);
-          });
-          // Clear the srcObject
-          videoElement.srcObject = null;
-        }
-      };
+      }
+      catch(err){
+        console.error('WebRTC connection error:', err);
+      }
     }
-    
-  }, [camera?.camera_id, camera?.status, camera?.enabled])
+    init();
 
-  const updateCameraStatusInCache = (cameraId: string, status: 'online' | 'offline') => {
+    return () => {
+      isCancelled = true;
+      if(videoElement){
+        videoElement.srcObject = null;
+      }
+    }
+  }, [camera.cameraId, camera.enabled, camera.status]);
+
+  const updateCameraStatusInCache = (cameraId: number, status: 'online' | 'offline') => {
   queryClient.setQueryData<Camera[]>(['cameras'], (prev) =>
     prev?.map((cam) => {
-      if (cam.camera_id === cameraId) {
+      if (cam.cameraId === cameraId) {
         console.log(`Updated camera ${cameraId} status to ${status}`);
         return { ...cam, status };
       }
@@ -145,8 +73,6 @@ useEffect(() => {
     }) || []
   );
 };
-
-
 
   return (
     <div className="group relative aspect-video w-full overflow-hidden rounded-xl shadow-lg">
@@ -212,6 +138,4 @@ export const CameraGridSkeleton = () => {
     </>
   )
 }
-
-// You might need to export Videocard if it's not the default export
 export default Videocard;
