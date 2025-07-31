@@ -97,7 +97,7 @@ function Home() {
             {filteredCameras.length > 0 ? (
               <div className="grid grid-cols-1 gap-2 md:grid-cols-1 xl:grid-cols-2">
                 {filteredCameras.map((camera) => (
-                  <Videocard key={camera.camera_id} camera={camera} />
+                  <Videocard key={camera.cameraId} camera={camera} />
                 ))}
               </div>
             ) : (

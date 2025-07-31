@@ -3,15 +3,16 @@ from pathlib import Path
 from pydantic_settings import BaseSettings
 from typing import List, Tuple
 
+#TODO:Fix importing of environmental variables from .env file
 
 class Settings(BaseSettings):
     """Application configuration settings"""
 
     # Database Configuration
-    DATABASE_URL: str
+    DATABASE_URL: str = "sqlite:///./data/database/nexguard.db"
 
     # Application Settings
-    LOG_LEVEL: str
+    LOG_LEVEL: str = "INFO"
 
     # Directories
     DATA_DIR: Path = Path("./data")
