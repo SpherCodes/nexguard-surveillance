@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_, desc
 from datetime import datetime, timedelta
 
-from ..schema import Detection, Camera
+from ..core.models import Detection, Camera
 from ..schema import DetectionCreate, DetectionUpdate, Detection as DetectionSchema
 from ..utils.database_crud import CRUDBase, DatabaseManager
 
@@ -17,7 +17,7 @@ class DetectionService(CRUDBase[Detection, DetectionCreate, DetectionUpdate]):
         """Create a new detection"""
         if not DatabaseManager.validate_foreign_key(db, Camera, detection_data.camera_id):
             raise ValueError(f"Camera with id {detection_data.camera_id} does not exist")
-        
+
         return self.create(db, obj_in=detection_data)
 
     def get_by_camera(

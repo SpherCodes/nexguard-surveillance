@@ -45,7 +45,6 @@ class Detection(Base):
     timestamp = Column(Float, index=True)
     detection_type = Column(String, index=True)
     confidence = Column(Float)
-    bounding_box = Column(JSON)
     notified = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.now)
     

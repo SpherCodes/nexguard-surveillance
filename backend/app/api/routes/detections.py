@@ -7,7 +7,7 @@ import time
 from sqlalchemy.orm import Session
 
 from ...core.models import Detection, Media
-from ...services.detection import DetectionEventManager
+from ...utils.detection_manager import DetectionEventManager
 from ...dependencies import get_detection_event_manager, get_db
 
 router = APIRouter()

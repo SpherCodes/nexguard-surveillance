@@ -1,6 +1,5 @@
 from typing import List
-from fastapi import APIRouter, HTTPException, status
-from ...api import router
+from fastapi import APIRouter, Depends, HTTPException, status
 from ...dependencies import DatabaseDep, ZoneServiceDep
 
 from ...schema import (

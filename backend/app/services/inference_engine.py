@@ -1,12 +1,14 @@
 import asyncio
 import threading
-import cv2
 import numpy as np
 import time
 from ultralytics import YOLO
 import queue
 
-from .detection import DetectionEventManager
+from .video_capture import VideoCapture
+
+
+from ..utils.detection_manager import DetectionEventManager
 
 class YOLOProcessor:
     """Processes multiple camera streams using YOLOv11 for object detection."""
@@ -22,8 +24,8 @@ class YOLOProcessor:
         """
         self.model = YOLO(model_path)
         self.conf_threshold = conf_threshold
-        self.video_capture = None
         self.processing_threads = {}
+        self.video_capture = None
         self.stop_flags = {}
         self.results_buffer = {}
         self.display_buffers = {}
@@ -39,21 +41,32 @@ class YOLOProcessor:
             self.detection_manager.video_capture = video_capture
             self.detection_manager.inference_engine = self
     
-    def start_processing(self,camera_ids=None):
+    def start_processing(self, camera_ids, video_capture: VideoCapture = None):
+        print(f"Starting YOLO processing for cameras: {camera_ids}")
+        print(f"VideoCapture instance: {video_capture}")
         """
         Start processing threads for specified cameras or all enabled cameras.
         
         Args:
             camera_ids (List[str], optional): Camera IDs to process. If None, process all enabled cameras.
+            video_capture: VideoCapture instance to use (optional, uses self.video_capture if None)
         """
+        vc = video_capture if video_capture is not None else self.video_capture
+        
+        if vc is None:
+            print("❌ Error: No video_capture instance available.")
+            raise RuntimeError("No video_capture instance available. Either pass it as parameter or call connect_video_capture() first.")
+        
+        self.video_capture = vc
+        
         if camera_ids is None:
             camera_ids = [
-                camera_id for camera_id, config in self.video_capture.cameras.items()
+                camera_id for camera_id, config in vc.cameras.items()
                 if config.enabled
             ]
 
         for camera_id in camera_ids:
-            if camera_id not in self.video_capture.cameras:
+            if camera_id not in vc.cameras:
                 print(f"Camera {camera_id} not found.")
                 continue
             
@@ -108,9 +121,7 @@ class YOLOProcessor:
         Args:
             camera_id (str): The camera ID to process.
         """
-        print(f"starting processing for Camera: {camera_id}")
         last_frame_number = -1
-        processing_start_time = time.time()
         frames_processed = 0
         
         while not self.stop_flags.get(camera_id, True):
@@ -127,12 +138,9 @@ class YOLOProcessor:
             last_frame_number = frame_data.frame_number
             
             # Process frame with YOLO
-            inference_start = time.time()
             results = self.model(frame_data.frame, conf=self.conf_threshold, verbose=False)
-            inference_time = time.time() - inference_start
-              # Clear previous detections
+            # Clear previous detections
             frame_data.detections = []
-            human_detected = False
             
             for result in results:
                 boxes = result.boxes.cpu().numpy()
@@ -145,67 +153,17 @@ class YOLOProcessor:
                     }
                     frame_data.detections.append(detection)
                     
+
                     # Record detection synchronously
-                    # if self.detection_manager:
-                    #     self.detection_manager.record_detection(camera_id, frame_data, detection)
+                    if self.detection_manager:
+                        self.detection_manager.record_detection(camera_id, frame_data, detection , self)
                     
                     # Track human detection for UI
-                    # if detection['name'].lower() == 'person':
-                    #     human_detected = True
-                    #     print(f"Human detected in camera {camera_id}")
+                    if detection['name'].lower() == 'person':
+                        print(f"Human detected in camera {camera_id}")
             
             # Create annotated frame
             annotated_frame = frame_data.frame.copy()
-            
-            # Draw detections
-            # for detection in frame_data.detections:
-            #     box = detection['box']
-            #     cls_name = detection['name']
-            #     conf = detection['conf']
-                
-            #     text = f"{cls_name} {conf:.2f}"
-            #     (text_width, text_height), _ = cv2.getTextSize(
-            #         text, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2
-            #     )
-                
-            #     # Draw box and label
-            #     cv2.rectangle(annotated_frame, (box[0], box[1]), (box[2], box[3]), (0, 255, 0), 2)
-            #     cv2.rectangle(
-            #         annotated_frame,
-            #         (box[0], box[1] - text_height - 10),
-            #         (box[0] + text_width, box[1]),
-            #         (0, 255, 0),
-            #         -1
-            #     )
-            #     cv2.putText(annotated_frame, text, (box[0], box[1] - 5),
-            #                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
-            
-            # Add stats overlay
-            # fps = frames_processed / (time.time() - processing_start_time)
-            
-            # status_text = f"FPS: {fps:.1f} | Inference: {inference_time*1000:.1f}ms"
-            # if human_detected:
-            #     status_text += " | 🚨 HUMAN DETECTED"
-                
-            # cv2.putText(
-            #     annotated_frame,
-            #     status_text,
-            #     (10, 30),
-            #     cv2.FONT_HERSHEY_SIMPLEX,
-            #     0.7,
-            #     (0, 0, 255) if human_detected else (0, 255, 0),
-            #     2
-            # )
-            
-            # cv2.putText(
-            #     annotated_frame,
-            #     f"Camera: {camera_id}",
-            #     (10, 60),
-            #     cv2.FONT_HERSHEY_SIMPLEX,
-            #     0.6,
-            #     (255, 255, 255),
-            #     2
-            # )
             
             # Store the annotated frame
             frame_data.annotated_frame = annotated_frame
