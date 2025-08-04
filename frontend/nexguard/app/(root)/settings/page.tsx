@@ -13,12 +13,12 @@ function SettingsPage() {
         <div className="p-3 rounded-2xl">
             <Settings className="h-8 w-8" />
         </div>
-         <header className="text-4xl font-bold">
+        <header className="text-4xl font-bold">
               Settings
         </header>
       </div>
       <Tabs defaultValue="Cameras" className="w-full flex-1">
-        <TabsList className="grid w-full max-w-lg grid-cols-4 bg-gray-200/75 p-1 dark:bg-gray-800">
+        <TabsList className="grid w-full max-w-lg grid-cols-4 bg-gray-200/75 p-1">
           {SettingsTabList.map((tab) => <TabsTrigger key={tab.value} value={tab.value}>{tab.label}</TabsTrigger>)}
         </TabsList>
 

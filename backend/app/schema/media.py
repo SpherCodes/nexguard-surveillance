@@ -39,9 +39,13 @@ class MediaUpdate(BaseModel):
 
 
 class Media(MediaBase):
-    """Complete media schema with database fields"""
+    """Complete media schema with database fields (Optional image data)"""
     id: int
     created_at: datetime
+    image_data: Optional[str] = Field(
+        None, 
+        description="Base64-encoded file content (only populated for images)"
+    )
 
     class Config:
         from_attributes = True

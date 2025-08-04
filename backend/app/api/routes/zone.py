@@ -30,6 +30,7 @@ async def create_zone(
     zone_service: ZoneServiceDep
 ):
     """Create a new zone"""
+    print(f"creating zone: {zone_data}")
     try:
         zone = zone_service.create_zone(db, zone_data)
         return zone

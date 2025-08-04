@@ -48,13 +48,18 @@ interface FeedProps {
 type DetectionEvent = {
   id: string;
   cameraId: string;
-  type: string;
-  timestamp: string;
+  timestamp: Date;
   description?: string;
-  thumbnailImg: string;
   confidence: GLfloat;
-  thumbnail?: string;
+  image_media?: DetectionImageMedia[];
 };
+
+type DetectionImageMedia = {
+  cameraId: number;
+  detectionId: number;
+  imageData: string;
+  createdAt: Date;
+}
 
 declare interface Zone {
   id: number;
@@ -66,7 +71,7 @@ type CameraFormData = z.infer<typeof cameraFormSchema>;
 interface CameraFormProps {
   initialData?: Camera | null;
   zones: Zone[];
-  onSubmit: (data: CameraFormData, id?: string) => void;
+  onSubmit: (data: CameraFormData, id?: number) => void;
   onDelete?: (id: string) => void;
   onCreateZone: (zoneName: string) => Promise<Zone>;
 }

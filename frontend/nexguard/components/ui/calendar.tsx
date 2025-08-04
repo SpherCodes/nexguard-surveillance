@@ -3,14 +3,14 @@
 import * as React from "react"
 import { getDetectionEventsByDay } from "@/lib/actions/api.actions"
 import {
-  ChevronDownIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
 } from "lucide-react"
 import { DayButton, DayPicker, getDefaultClassNames } from "react-day-picker"
 
 import { cn } from "@/lib/utils"
-import { Button, buttonVariants } from "@/components/ui/button"
+import { Button } from "@/components/ui/button"
+import { DetectionEvent } from "@/Types"
 
 function Calendar({
   className,
@@ -18,7 +18,7 @@ function Calendar({
   onSelectedDate,
 }: React.ComponentProps<typeof DayPicker> & {
   buttonVariant?: React.ComponentProps<typeof Button>["variant"]
-  onSelectedDate?: (date: Date, events: any[]) => void
+  onSelectedDate?: (date: Date, events: DetectionEvent[]) => void
 }) {
 
   // Helper function to get start of week (Sunday)
@@ -28,14 +28,6 @@ function Calendar({
     startOfWeek.setDate(startOfWeek.getDate() - dayOfWeek)
     startOfWeek.setHours(0, 0, 0, 0)
     return startOfWeek
-  }
-
-  // Helper function to get end of week (Saturday)
-  const getWeekEnd = (weekStart: Date): Date => {
-    const weekEnd = new Date(weekStart)
-    weekEnd.setDate(weekStart.getDate() + 6)
-    weekEnd.setHours(23, 59, 59, 999)
-    return weekEnd
   }
 
   // Helper function to safely add days to a date
@@ -50,9 +42,6 @@ function Calendar({
     const date = defaultMonth || new Date()
     return getWeekStart(date)
   })
-
-  // Calculate the week end date
-  const currentWeekEnd = getWeekEnd(currentWeekStart)
 
   // Navigation functions with proper date handling
   const goToPreviousWeek = () => {
@@ -108,7 +97,7 @@ function Calendar({
             <ChevronLeftIcon className="h-4 w-4 text-gray-600" />
           </Button>
 
-          <div className="flex items-center space-x-1 flex-1 justify-center">
+          <div className="flex items-center gap-0.5 flex-1 justify-center">
             {weekDays.map((day, index) => {
               const isToday = day.getTime() === today.getTime()
               const isSelected = selectedDate && day.getTime() === selectedDate.getTime()
@@ -124,14 +113,14 @@ function Calendar({
                     onSelectedDate?.(day, data)
                   }}
                   className={cn(
-                    "flex flex-col items-center min-w-[28px] px-1.5 py-1.5 rounded-lg transition-all duration-200",
+                    "flex flex-col items-center flex-1 min-w-0 px-1 py-1.5 rounded-lg transition-all duration-200",
                     isSelected || isToday
                       ? "bg-black text-white shadow-md" 
                       : "text-gray-700 hover:bg-gray-100"
                   )}
                 >
                   <div className={cn(
-                    "text-xs font-medium mb-0.5",
+                    "text-xs font-medium mb-0.5 truncate",
                     isSelected || isToday ? "text-white" : "text-gray-500"
                   )}>
                     {dayName}
@@ -162,10 +151,10 @@ function Calendar({
 
   return (
   <div className={cn(
-    "bg-white p-3 max-w-[22em] w-full mx-auto flex justify-center",
+    "bg-white p-3 w-full mx-auto",
     className
   )}>
-    <div className="w-full overflow-x-auto">
+    <div className="w-full">
       <HorizontalWeekView />
     </div>
   </div>

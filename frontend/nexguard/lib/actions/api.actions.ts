@@ -11,7 +11,6 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 export async function getCameras(): Promise<Camera[]> {
   try {
     const url = `${API_BASE_URL}/api/v1/cameras`;
-
     const response = await fetch(url);
     if (!response.ok) {
       if (response.status === 404) {
@@ -21,9 +20,7 @@ export async function getCameras(): Promise<Camera[]> {
         `Failed to fetch cameras: ${response.status} ${response.statusText}`
       );
     }
-
     const data = await response.json();
-
     return data.map(
       (camera: any): Camera => ({
         cameraId: camera.id,
@@ -62,9 +59,8 @@ export async function getCamera(id: string): Promise<Camera | null> {
 }
 
 export async function updateCamera(
-  id: string,
-  updates: Partial<Camera>
-): Promise<Camera> {
+  id: number,
+  updates: Camera): Promise<Camera> {
   try {
     const url = `${API_BASE_URL}/api/v1/cameras/${id}`;
     const payload = {
@@ -74,7 +70,6 @@ export async function updateCamera(
       location: updates.location,
       zoneId: updates.zoneId
     };
-
     const response = await fetch(url, {
       method: 'PUT',
       headers: {
@@ -82,13 +77,11 @@ export async function updateCamera(
       },
       body: JSON.stringify(payload)
     });
-
     if (!response.ok) {
       throw new Error(
         `Failed to create camera: ${response.status} ${response.statusText}`
       );
     }
-
     const data = await response.json();
     return data;
   } catch (error) {
@@ -105,9 +98,9 @@ export async function createCamera(cameraData: Camera): Promise<Camera> {
       enabled: cameraData.enabled,
       resolution: cameraData.resolution,
       location: cameraData.location,
-      zoneId: cameraData.zoneId
+      zone_id: cameraData.zoneId
     };
-
+    console.log('Creating camera with payload:', payload);
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -115,13 +108,11 @@ export async function createCamera(cameraData: Camera): Promise<Camera> {
       },
       body: JSON.stringify(payload)
     });
-
     if (!response.ok) {
       throw new Error(
         `Failed to create camera: ${response.status} ${response.statusText}`
       );
     }
-
     const data = await response.json();
     return data;
   } catch (error) {
@@ -129,13 +120,12 @@ export async function createCamera(cameraData: Camera): Promise<Camera> {
   }
 }
 
-export async function deleteCamera(id: string): Promise<void> {
+export async function deleteCamera(id: number): Promise<void> {
   try {
     const url = `${API_BASE_URL}/api/v1/cameras/${id}`;
     const response = await fetch(url, {
       method: 'DELETE'
     });
-
     if (!response.ok) {
       throw new Error(
         `Failed to delete camera: ${response.status} ${response.statusText}`
@@ -147,42 +137,18 @@ export async function deleteCamera(id: string): Promise<void> {
   }
 }
 
-export async function getLatestAlerts(): Promise<DetectionEvent[]> {
-  try {
-    const url = `${API_BASE_URL}/api/v1/detections/recent`;
-
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(
-        `Failed to fetch latest alerts: ${response.status} ${response.statusText}`
-      );
-    }
-    const data = await response.json();
-    // Map API fields to DetectionEvent fields
-    return data.map((item: DetectionEvent) => ({
-      id: item.id,
-      cameraId: item.cameraId,
-      timestamp: item.timestamp,
-      description: undefined,
-      thumbnailImg: item.thumbnail
-        ? `data:image/jpeg;base64,${item.thumbnail}`
-        : undefined,
-      confidence: item.confidence
-    }));
-  } catch (error) {
-    throw error;
-  }
-}
-
 export async function getDetectionEventsByDay(day: Date) {
   if (!day) {
     throw new Error('Day parameter is required');
   }
   try {
     const formattedDate = day.toISOString().split('T')[0];
-    const url = `${API_BASE_URL}/api/v1/detections/day/${formattedDate}`;
+    console.log(`Fetching events for date: ${formattedDate}`);
+    const url = `${API_BASE_URL}/api/v1/detections/date/${formattedDate}`;
 
     const response = await fetch(url);
+
+    console.log(`Data: ${JSON.stringify(response)}`);
 
     if (response.status === 404) {
       return [];
@@ -194,17 +160,36 @@ export async function getDetectionEventsByDay(day: Date) {
         `Failed to fetch detection events: ${response.status} ${response.statusText} - ${errorData}`
       );
     }
-    const data = await response.json();
-    return data;
+    const raw = await response.json();
+
+    return Array.isArray(raw)
+      ? raw.map(
+          (event: any): DetectionEvent => ({
+            id: event.id,
+            cameraId: event.camera_id,
+        timestamp: new Date(event.timestamp),
+        confidence: event.confidence,
+        image_media: event.image_media
+          ? event.image_media.map((img: any) => ({
+              cameraId: img.camera_id,
+              detectionId: img.detection_id,
+              imageData: img.image_data,
+              createdAt: new Date(img.created_at),
+              media_path: img.media_path
+            }))
+          : []
+      })
+      )
+      : [];
   } catch (error) {
-    throw error; // Re-throw for TanStack Query to handle
+    throw error;
   }
 }
 
 //Zone API functions
 export async function getZones(): Promise<Zone[]> {
   try {
-    const url = `${API_BASE_URL}/api/v1/zones`;
+    const url = `${API_BASE_URL}/api/v1/zones/`;
 
     const response = await fetch(url);
     if (!response.ok) {
@@ -218,16 +203,19 @@ export async function getZones(): Promise<Zone[]> {
     throw error;
   }
 }
-export async function createZone(zoneName: string): Promise<Zone> {
+export async function createZone(zoneName: string, zoneDescription: string): Promise<Zone> {
   try {
-    const url = `${API_BASE_URL}/api/v1/zones/${zoneName}`;
-
+    const url = `${API_BASE_URL}/api/v1/zones/`;
+    const  payload = {
+      name: zoneName,
+      zoneDescription: zoneDescription,
+    }
     const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(zoneName)
+      body: JSON.stringify(payload)
     });
 
     if (!response.ok) {
@@ -257,7 +245,7 @@ export async function getInferenceSettings(): Promise<SystemInfrenceSettings> {
     const data = await response.json();
     return {
       model: data.model,
-      min_detection_threshold: data.min_detection_threshold,
+      min_detection_threshold: data.min_detection_threshold
     } as SystemInfrenceSettings;
   } catch (error) {
     console.error('Error fetching inference settings:', error);
@@ -277,8 +265,8 @@ export async function getSystemStorageSettings(): Promise<SystemStorageSettings>
     const data = await response.json();
     return {
       storageType: data.storage_type,
-      retentionDays: data.retention_days,
-    }
+      retentionDays: data.retention_days
+    };
   } catch (error) {
     console.error('Error fetching storage settings:', error);
     throw error;

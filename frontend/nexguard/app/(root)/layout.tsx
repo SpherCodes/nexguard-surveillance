@@ -2,7 +2,7 @@
 
 import React from 'react'
 import Sidebar from '@/components/ui/Sidebar'
-import RightFeed from '@/components/ui/RightFeed'
+import RightFeed from '@/components/RightFeed'
 import { Providers } from '../providers'
 
 const RootLayout = ({ children }: { children: React.ReactNode }) => {
