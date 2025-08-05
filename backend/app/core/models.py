@@ -33,8 +33,8 @@ class Camera(Base):
 
     # Relationships
     zone = relationship("Zone", back_populates="cameras")
-    detections = relationship("Detection", back_populates="camera", cascade="all, delete")
-    media = relationship("Media", back_populates="camera", cascade="all, delete")
+    detections = relationship("Detection", back_populates="camera")
+    media = relationship("Media", back_populates="camera")
 
 
 class Detection(Base):
@@ -45,7 +45,6 @@ class Detection(Base):
     timestamp = Column(Float, index=True)
     detection_type = Column(String, index=True)
     confidence = Column(Float)
-    bounding_box = Column(JSON)
     notified = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.now)
     

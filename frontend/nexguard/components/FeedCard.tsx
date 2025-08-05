@@ -1,7 +1,15 @@
-import Image from 'next/image'
+import { FeedProps } from '@/Types'
 import React from 'react'
+import Image from 'next/image'
 
 const FeedCard = ({ alertEvent }: FeedProps) => {
+  const thumbnailBase64 = alertEvent.image_media?.[0]?.imageData;
+  const thumbnailSrc = thumbnailBase64
+    ? thumbnailBase64.startsWith('data:')
+      ? thumbnailBase64
+      : `data:image/jpeg;base64,${thumbnailBase64}`
+    : null;
+
   const timestamp = alertEvent.timestamp ? new Date(alertEvent.timestamp) : null
 
   const formattedDate = timestamp?.toLocaleDateString('en-ZA', {
@@ -21,14 +29,14 @@ const FeedCard = ({ alertEvent }: FeedProps) => {
     <div
       className="group transition-all duration-300 ease-in-out transform hover:scale-[1.02] hover:shadow-lg bg-white border border-gray-100 rounded-md p-3 flex gap-4 w-full items-center"
     >
-      {/* Thumbnail */}
       <div className="flex-shrink-0">
-        {alertEvent.thumbnailImg ? (
+        {thumbnailSrc ? (
           <Image
-            src={alertEvent.thumbnailImg}
+            src={thumbnailSrc}
             alt="Detection thumbnail"
-            width={150}
-            height={40}
+            width={160}
+            height={90}
+            unoptimized
             className="rounded-md object-cover border border-gray-200 group-hover:shadow-md transition-shadow duration-300"
           />
         ) : (
@@ -38,7 +46,6 @@ const FeedCard = ({ alertEvent }: FeedProps) => {
         )}
       </div>
 
-      {/* Info */}
       <div className="flex-1 text-sm text-gray-800">
         <div className="font-medium text-base text-gray-900">
           Camera: <span className="font-semibold">{alertEvent.cameraId}</span>

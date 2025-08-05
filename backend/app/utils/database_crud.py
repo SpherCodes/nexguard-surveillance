@@ -37,6 +37,7 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         db.add(db_obj)
         try:
             db.commit()
+            db.flush() 
             db.refresh(db_obj)
             return db_obj
         except IntegrityError as e:

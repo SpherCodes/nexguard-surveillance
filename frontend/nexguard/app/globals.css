@@ -1,14 +1,10 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-@custom-variant dark (&:is(.dark *));
-
-/* Hide scrollbar for Chrome, Safari and Opera */
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
 
-/* Hide scrollbar for IE, Edge and Firefox */
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
@@ -19,7 +15,6 @@
     @apply flex h-16 items-center justify-between p-5 sm:p-8 md:hidden;
   }
 
-  /* Custom scrollbar utility */
   .scrollbar-hide {
     -ms-overflow-style: none;
     scrollbar-width: none;
@@ -29,7 +24,6 @@
     display: none;
   }
 
-  /* Home - includes scrollbar hiding */
   .home {
     @apply flex w-full flex-row max-xl:max-h-screen max-xl:overflow-y-scroll;
     -ms-overflow-style: none;

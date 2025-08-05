@@ -11,11 +11,12 @@ from .core.models import Camera
 from .services.camera_service import camera_service
 from .Settings import settings
 from .data.seed import seed_default_settings, seed_default_zones
-from .dependencies import get_video_capture
+from .dependencies import get_video_capture , get_inference_engine
 from .services.video_capture import CameraConfig, VideoCapture
 from .api.router import api_router
 
 video_capture = get_video_capture()
+inference_engine = get_inference_engine()
 
 
 def setup_database():
@@ -45,11 +46,9 @@ def setup_database():
 async def lifespan(app: FastAPI):
     print("Starting NexGuard API...")
     
-    # Setup database using new structure
     setup_database()
-    create_tables()  # Using the new database module
-    
-    # Use the new database session management
+    create_tables()
+
     db = SessionLocal()
     try:
         seed_default_settings(db)
@@ -59,6 +58,7 @@ async def lifespan(app: FastAPI):
         # Get cameras using the service layer
         cameras = camera_service.get_active_cameras(db)
         print(f"🎥 Starting {len(cameras)} active camera(s)...")
+        print(f"Infrence instance:{inference_engine}")
 
         for camera in cameras:
             # Create CameraConfig instance
@@ -74,10 +74,15 @@ async def lifespan(app: FastAPI):
             added = video_capture.add_camera(config)
             if added:
                 print(f"✅ Camera {camera.id} configured")
-                # Update last_active timestamp
                 camera_service.update_last_active(db, camera.id)
             else:
                 print(f"⚠️ Camera {camera.id} already exists")
+        
+        camera_ids = list(video_capture.cameras.keys())
+        
+        if camera_ids:
+            print(f"Starting YOLO processing for cameras: {camera_ids}")
+            inference_engine.start_processing(camera_ids , video_capture)
 
         # Start all enabled cameras
         video_capture.start_all_cameras()

@@ -1,6 +1,5 @@
 from typing import List
-from fastapi import APIRouter, HTTPException, status
-from ...api import router
+from fastapi import APIRouter, Depends, HTTPException, status
 from ...dependencies import DatabaseDep, ZoneServiceDep
 
 from ...schema import (
@@ -31,6 +30,7 @@ async def create_zone(
     zone_service: ZoneServiceDep
 ):
     """Create a new zone"""
+    print(f"creating zone: {zone_data}")
     try:
         zone = zone_service.create_zone(db, zone_data)
         return zone

@@ -23,7 +23,7 @@ import { getCameras, updateCamera, deleteCamera, createCamera, getZones, createZ
 import type { Camera, Zone } from '@/Types';
 function CameraSettings() {
   const [isAdding, setIsAdding] = useState(false);
-  const [selectedCameraId, setSelectedCameraId] = useState<string | null>(null);
+  const [selectedCameraId, setSelectedCameraId] = useState<number | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [cameraToDelete, setCameraToDelete] = useState<Camera | null>(null);
   const queryClient = useQueryClient();
@@ -32,7 +32,6 @@ function CameraSettings() {
     queryKey: ['cameras'],
     queryFn: getCameras,
   });
-
   const { data: zones = [] } = useQuery<Zone[]>({
     queryKey: ['zones'],
     queryFn: getZones,
@@ -40,39 +39,39 @@ function CameraSettings() {
 
   useEffect(() => {
     if (!isAdding && !selectedCameraId && cameras.length > 0) {
-      setSelectedCameraId(cameras[0].camera_id);
+      setSelectedCameraId(cameras[0].cameraId);
     }
 
-    if (selectedCameraId && !cameras.find(c => c.camera_id === selectedCameraId)) {
-      setSelectedCameraId(cameras.length > 0 ? cameras[0].camera_id : null);
+    if (selectedCameraId && !cameras.find(c => c.cameraId === selectedCameraId)) {
+      setSelectedCameraId(cameras.length > 0 ? cameras[0].cameraId : null);
       if (cameras.length === 0) setIsAdding(false);
     }
   }, [cameras, selectedCameraId, isAdding]);
 
   const selectedCamera = useMemo(() =>
-    cameras.find(c => c.camera_id === selectedCameraId) || null,
+    cameras.find(c => c.cameraId === selectedCameraId) || null,
     [cameras, selectedCameraId]
   );
-
   const { mutate: saveCameraMutate, isPending: isSaving } = useMutation({
-    mutationFn: ({ data, id }: { data: Partial<Camera>, id?: string }) =>
-      id ? updateCamera(id, data) : createCamera(data),
+    mutationFn: ({ data, id }: { data: Camera, id?: number }) => {
+      return id ? updateCamera(id, data) : createCamera(data);
+    },
     onSuccess: (savedCamera) => {
       queryClient.invalidateQueries({ queryKey: ['cameras'] });
       setIsAdding(false);
-      setSelectedCameraId(savedCamera.camera_id);
+      setSelectedCameraId(savedCamera.cameraId);
       toast.success(`Camera '${savedCamera.name}' saved successfully`);
     },
     onError: (err: Error) => toast.error(`Save failed: ${err.message}`),
   });
 
   const { mutateAsync: createZoneMutate } = useMutation({
-    mutationFn: (zoneName: string) => createZone({ name: zoneName }),
+    mutationFn: (zoneName: string) => createZone(zoneName),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['zones'] }),
   });
 
   const { mutate: deleteCameraMutate, isPending: isDeleting } = useMutation({
-    mutationFn: (id: string) => deleteCamera(id),
+    mutationFn: (id: number) => deleteCamera(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cameras'] });
       setDeleteDialogOpen(false);
@@ -81,8 +80,7 @@ function CameraSettings() {
     onError: (err: Error) => toast.error(`Delete failed: ${err.message}`),
   });
 
-  // --- Event Handlers ---
-  const handleSelectCamera = (id: string) => {
+  const handleSelectCamera = (id: number) => {
     setIsAdding(false);
     setSelectedCameraId(id);
   };
@@ -96,9 +94,7 @@ function CameraSettings() {
     setCameraToDelete(camera);
     setDeleteDialogOpen(true);
   }, []);
-
   if (error) return <ErrorState message={error.message} onRetry={refetch} />;
-
   return (
     <>
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
@@ -110,15 +106,14 @@ function CameraSettings() {
           <div className="space-y-2 overflow-y-auto">
             {isLoadingCameras ? Array.from({ length: 4 }).map((_, i) => <CameraItemSkeleton key={i} />)
               : cameras.map((camera) => (
-                <CameraItem key={camera.camera_id} camera={camera} isSelected={!isAdding && selectedCameraId === camera.camera_id} onSelect={() => handleSelectCamera(camera.camera_id)} />
+                <CameraItem key={camera.cameraId} camera={camera} isSelected={!isAdding && selectedCameraId === camera.cameraId} onSelect={() => handleSelectCamera(camera.cameraId)} />
               ))}
           </div>
         </div>
-
         <div className="lg:col-span-2">
           {isAdding || selectedCamera ? (
             <CameraForm
-              key={isAdding ? 'add-new' : selectedCamera?.camera_id}
+              key={isAdding ? 'add-new' : selectedCamera?.cameraId}
               initialData={isAdding ? null : selectedCamera}
               onSubmit={(data, id) => saveCameraMutate({ data, id })}
               onDelete={() => selectedCamera && handleDeleteClick(selectedCamera)}
@@ -145,7 +140,7 @@ function CameraSettings() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => cameraToDelete && deleteCameraMutate(cameraToDelete.camera_id)}
+              onClick={() => cameraToDelete && deleteCameraMutate(cameraToDelete.cameraId)}
               className="bg-red-600 hover:bg-red-700"
               disabled={isDeleting}
             >
@@ -185,7 +180,6 @@ const ErrorState = ({ message, onRetry }: { message: string; onRetry: () => void
     </div>
   </div>
 );
-
 // const EmptyState = ({ onAddCamera }: { onAddCamera: () => void; }) => (
 //   <div className="flex h-full min-h-[400px] items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-100/50 dark:border-gray-700 dark:bg-gray-800/20">
 //     <div className="text-center">

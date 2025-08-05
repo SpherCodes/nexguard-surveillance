@@ -9,8 +9,6 @@ import { useQuery } from '@tanstack/react-query'
 
 function Home() {
   const [activeZoneId, setActiveZoneId] = useState<number>(0)
-
-  // Query for zones
   const {
     data: zones = [],
     isLoading: zonesLoading,
@@ -22,7 +20,6 @@ function Home() {
     gcTime: 10 * 60 * 1000, 
   })
 
-  // Query for cameras
   const {
     data: cameras = [],
     isLoading: camerasLoading,
@@ -37,7 +34,6 @@ function Home() {
   const isLoading = zonesLoading || camerasLoading
 
   if (zonesError || camerasError) {
-    console.error('Failed to fetch data:', zonesError || camerasError)
     return (
       <section className="flex h-full w-full flex-col sm:p-4 lg:p-4 overflow-none">
         <div className="flex h-64 w-full items-center justify-center rounded-lg border-2 border-dashed border-red-200 dark:border-red-700">
@@ -56,15 +52,14 @@ function Home() {
 
   return (
     <section className="flex h-full w-full flex-col overflow-none">
-      {/* Header with Zone Tabs */}
       <header className="mb-6 flex flex-wrap items-center gap-2">
         <button
           onClick={() => setActiveZoneId(0)}
           className={cn(
             "rounded-lg px-4 py-2 text-sm font-medium transition-colors",
             activeZoneId === 0
-              ? 'bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900'
-              : 'text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800'
+              ? 'bg-gray-900 text-white'
+              : 'text-gray-500 hover:bg-gray-100'
           )}
         >
           All
@@ -77,7 +72,7 @@ function Home() {
               "rounded-lg px-4 py-2 text-sm font-medium transition-colors",
               activeZoneId === zone.id
                 ? 'bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900'
-                : 'text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800'
+                : 'text-gray-500 hover:bg-gray-100 dark:text-gray-400'
             )}
           >
             {zone.name}
@@ -90,7 +85,7 @@ function Home() {
         ) : (
           <>
             <div className="mb-4">
-              <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200">
+              <h2 className="text-2xl font-bold text-gray-800">
                 {activeZoneId === 0 ? 'All Cameras' : zones.find(z => z.id === activeZoneId)?.name || activeZoneId}
               </h2>
             </div>
@@ -116,5 +111,4 @@ function Home() {
     </section>
   )
 }
-
 export default Home

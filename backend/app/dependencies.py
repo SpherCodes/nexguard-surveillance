@@ -2,25 +2,27 @@
 FastAPI dependencies with database integration
 """
 from functools import lru_cache
-from typing import Generator, Annotated
+from typing import Generator, Annotated, Optional
 from webbrowser import get
 from fastapi import Depends
 from sqlalchemy.orm import Session
 
+from .utils.detection_manager import DetectionEventManager
+
+from .utils import detection_manager
 
 
-from .core.database.connection import get_db, SessionLocal
+
+from .core.database.connection import get_db
 from .services.camera_service import camera_service
 from .services.zone_service import zone_service
 from .services.detection_service import detection_service
 from .services.video_capture import VideoCapture
 from .services.inference_engine import YOLOProcessor as InferenceEngine
-from .services.detection import DetectionEventManager 
 
-_video_capture = None
-_inference_engine = None
-
-# TODO: Remove get_database_session from dependencies.py and use the one defined in connection.py
+_video_capture: Optional[VideoCapture] = None
+_inference_engine: Optional[InferenceEngine] = None
+_detection_manager: Optional[DetectionEventManager] = None
 
 def get_video_capture() -> VideoCapture:
     """Get or create video capture singleton"""
@@ -30,19 +32,16 @@ def get_video_capture() -> VideoCapture:
     return _video_capture
 
 def get_inference_engine() -> InferenceEngine:
-    """Get or create inference engine singleton"""
+    """Get inference engine instance with detection manager"""
     global _inference_engine
     if _inference_engine is None:
-        _inference_engine = InferenceEngine()
+        detection_manager = get_detection_event_manager()
+        _inference_engine = InferenceEngine(detection_manager=detection_manager)
     return _inference_engine
 
 def get_database_session() -> Generator[Session, None, None]:
     """Get database session for FastAPI dependency injection"""
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+    yield from get_db()
 
 def get_camera_service():
     """Get camera service instance"""
@@ -56,10 +55,12 @@ def get_detection_service():
     """Get detection service instance"""
     return detection_service
 
-@lru_cache()
-def get_detection_event_manager() -> DetectionEventManager:
-    """Single instance for all cameras"""
-    return DetectionEventManager()
+def get_detection_event_manager():
+    """Get detection event manager instance"""
+    global _detection_manager
+    if _detection_manager is None:
+        _detection_manager = DetectionEventManager()
+    return _detection_manager
 
 DatabaseDep = Annotated[Session, Depends(get_database_session)]
 CameraServiceDep = Annotated[object, Depends(get_camera_service)]

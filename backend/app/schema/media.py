@@ -3,7 +3,6 @@ from typing import Optional
 from pydantic import BaseModel, Field, field_validator, validator
 from enum import Enum
 
-
 class MediaType(str, Enum):
     """Enum for media types"""
     IMAGE = "image"
@@ -28,15 +27,6 @@ class MediaBase(BaseModel):
             raise ValueError('Path must be a non-empty string')
         return v.strip()
 
-    @field_validator('duration')
-    def validate_duration(cls, v, values):
-        """Validate duration is provided for video/audio"""
-        media_type = values.get('media_type')
-        if media_type in [MediaType.VIDEO, MediaType.AUDIO] and v is None:
-            raise ValueError(f'Duration is required for {media_type} media')
-        return v
-
-
 class MediaCreate(MediaBase):
     """Schema for creating new media"""
     pass
@@ -49,9 +39,13 @@ class MediaUpdate(BaseModel):
 
 
 class Media(MediaBase):
-    """Complete media schema with database fields"""
+    """Complete media schema with database fields (Optional image data)"""
     id: int
     created_at: datetime
+    image_data: Optional[str] = Field(
+        None, 
+        description="Base64-encoded file content (only populated for images)"
+    )
 
     class Config:
         from_attributes = True

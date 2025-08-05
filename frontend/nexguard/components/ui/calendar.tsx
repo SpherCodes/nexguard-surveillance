@@ -1,24 +1,24 @@
 "use client"
 
 import * as React from "react"
-import { getDetectionEventsByDay } from "@/lib/actions/api.actions"
 import {
-  ChevronDownIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
 } from "lucide-react"
 import { DayButton, DayPicker, getDefaultClassNames } from "react-day-picker"
 
 import { cn } from "@/lib/utils"
-import { Button, buttonVariants } from "@/components/ui/button"
+import { Button } from "@/components/ui/button"
 
 function Calendar({
   className,
   defaultMonth = new Date(),
-  onSelectedDate,
+  selected,
+  onSelect,
 }: React.ComponentProps<typeof DayPicker> & {
   buttonVariant?: React.ComponentProps<typeof Button>["variant"]
-  onSelectedDate?: (date: Date, events: any[]) => void
+  selected?: Date
+  onSelect: (date: Date | undefined) => void
 }) {
 
   // Helper function to get start of week (Sunday)
@@ -30,14 +30,6 @@ function Calendar({
     return startOfWeek
   }
 
-  // Helper function to get end of week (Saturday)
-  const getWeekEnd = (weekStart: Date): Date => {
-    const weekEnd = new Date(weekStart)
-    weekEnd.setDate(weekStart.getDate() + 6)
-    weekEnd.setHours(23, 59, 59, 999)
-    return weekEnd
-  }
-
   // Helper function to safely add days to a date
   const addDays = (date: Date, days: number): Date => {
     const result = new Date(date)
@@ -45,14 +37,19 @@ function Calendar({
     return result
   }
 
-  // State to track the current week
+  // State to track the current week - initialize with selected date if available
   const [currentWeekStart, setCurrentWeekStart] = React.useState(() => {
-    const date = defaultMonth || new Date()
-    return getWeekStart(date)
+    const initialDate = selected || defaultMonth || new Date()
+    return getWeekStart(initialDate)
   })
 
-  // Calculate the week end date
-  const currentWeekEnd = getWeekEnd(currentWeekStart)
+  // Update week when selected date changes
+  React.useEffect(() => {
+    if (selected) {
+      const selectedWeekStart = getWeekStart(selected)
+      setCurrentWeekStart(selectedWeekStart)
+    }
+  }, [selected])
 
   // Navigation functions with proper date handling
   const goToPreviousWeek = () => {
@@ -74,8 +71,12 @@ function Calendar({
     return days
   }, [currentWeekStart])
 
-  // State for selected date
-  const [selectedDate, setSelectedDate] = React.useState<Date | null>(null)
+  // Helper function to check if two dates are the same day
+  const isSameDay = (date1: Date, date2: Date): boolean => {
+    return date1.getFullYear() === date2.getFullYear() &&
+           date1.getMonth() === date2.getMonth() &&
+           date1.getDate() === date2.getDate()
+  }
 
   // Custom horizontal week component
   const HorizontalWeekView = () => {
@@ -108,37 +109,37 @@ function Calendar({
             <ChevronLeftIcon className="h-4 w-4 text-gray-600" />
           </Button>
 
-          <div className="flex items-center space-x-1 flex-1 justify-center">
+          <div className="flex items-center gap-0.5 flex-1 justify-center">
             {weekDays.map((day, index) => {
-              const isToday = day.getTime() === today.getTime()
-              const isSelected = selectedDate && day.getTime() === selectedDate.getTime()
+              const isToday = isSameDay(day, today)
+              const isSelected = selected && isSameDay(day, selected)
               const dayName = day.toLocaleDateString('en-US', { weekday: 'short' })
               const dayNumber = day.getDate()
 
               return (
                 <button
                   key={index}
-                  onClick={ async () => {
-                    setSelectedDate(day)
-                    const data = await getDetectionEventsByDay(day)
-                    onSelectedDate?.(day, data)
+                  onClick={() => {
+                    onSelect(day)
                   }}
                   className={cn(
-                    "flex flex-col items-center min-w-[28px] px-1.5 py-1.5 rounded-lg transition-all duration-200",
-                    isSelected || isToday
+                    "flex flex-col items-center flex-1 min-w-0 px-1 py-1.5 rounded-lg transition-all duration-200",
+                    isSelected
                       ? "bg-black text-white shadow-md" 
+                      : isToday
+                      ? "bg-gray-200 text-gray-900 font-medium"
                       : "text-gray-700 hover:bg-gray-100"
                   )}
                 >
                   <div className={cn(
-                    "text-xs font-medium mb-0.5",
-                    isSelected || isToday ? "text-white" : "text-gray-500"
+                    "text-xs font-medium mb-0.5 truncate",
+                    isSelected ? "text-white" : "text-gray-500"
                   )}>
                     {dayName}
                   </div>
                   <div className={cn(
                     "text-sm font-bold",
-                    isSelected || isToday ? "text-white" : "text-gray-900"
+                    isSelected ? "text-white" : "text-gray-900"
                   )}>
                     {dayNumber}
                   </div>
@@ -161,15 +162,15 @@ function Calendar({
   }
 
   return (
-  <div className={cn(
-    "bg-white p-3 max-w-[22em] w-full mx-auto flex justify-center",
-    className
-  )}>
-    <div className="w-full overflow-x-auto">
-      <HorizontalWeekView />
+    <div className={cn(
+      "bg-white p-3 w-full mx-auto",
+      className
+    )}>
+      <div className="w-full">
+        <HorizontalWeekView />
+      </div>
     </div>
-  </div>
-)
+  )
 }
 
 function CalendarDayButton({

@@ -1,9 +1,14 @@
+import base64
+from pathlib import Path
 from typing import List, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, desc
+from sqlalchemy.orm import joinedload
 from datetime import datetime, timedelta
 
-from ..schema import Detection, Camera
+from ..Settings import settings
+
+from ..core.models import Detection, Camera
 from ..schema import DetectionCreate, DetectionUpdate, Detection as DetectionSchema
 from ..utils.database_crud import CRUDBase, DatabaseManager
 
@@ -17,7 +22,7 @@ class DetectionService(CRUDBase[Detection, DetectionCreate, DetectionUpdate]):
         """Create a new detection"""
         if not DatabaseManager.validate_foreign_key(db, Camera, detection_data.camera_id):
             raise ValueError(f"Camera with id {detection_data.camera_id} does not exist")
-        
+
         return self.create(db, obj_in=detection_data)
 
     def get_by_camera(
@@ -48,6 +53,45 @@ class DetectionService(CRUDBase[Detection, DetectionCreate, DetectionUpdate]):
                 .order_by(desc(Detection.timestamp))
                 .limit(limit)
                 .all())
+    
+    def get_by_date(
+        self, 
+        db: Session, 
+        date: datetime, 
+        camera_id: Optional[int] = None
+    ) -> List[DetectionSchema]:
+        """Get detections for a specific date"""
+        start_of_day = date
+        end_of_day   = start_of_day + timedelta(days=1)
+
+        # eager-load all media
+        query = (
+            db.query(Detection)
+              .options(joinedload(Detection.media))
+              .filter(
+                  Detection.timestamp >= start_of_day.timestamp(),
+                  Detection.timestamp <  end_of_day.timestamp()
+              )
+        )
+
+        if camera_id:
+            query = query.filter(Detection.camera_id == camera_id)
+
+        detections = query.order_by(desc(Detection.timestamp)).all()
+        try:
+            for det in detections:
+                #Load detection data
+                det.image_media = [m for m in det.media if m.media_type == "image"]
+                #Load image data if available
+                for m in det.image_media:
+                    abs_path = Path(settings.STORAGE_DIR) / m.path
+                    if abs_path.exists():
+                        with open(abs_path, "rb") as f:
+                            m.image_data = base64.b64encode(f.read()).decode("ascii")
+        except Exception as e:
+            print(f"Error loading image data: {e}")
+        return detections
+    
 
     def get_unnotified_detections(self, db: Session) -> List[Detection]:
         """Get all detections that haven't been notified"""

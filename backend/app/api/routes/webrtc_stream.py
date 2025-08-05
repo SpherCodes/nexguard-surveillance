@@ -3,7 +3,7 @@ from aiortc import RTCIceCandidate
 import json
 import asyncio
 
-from ...services.detection import DetectionEventManager
+from ...utils.detection_manager import DetectionEventManager
 
 from ...dependencies import get_detection_event_manager, get_inference_engine, get_video_capture
 from ...services.video_capture import VideoCapture

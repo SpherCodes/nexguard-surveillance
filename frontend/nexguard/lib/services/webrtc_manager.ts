@@ -1,5 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { updateCameraInCache } from '@/lib/utils';
+import { QueryClient } from '@tanstack/react-query';
+
+
+//TODO:Remove query client from WebRTCManager
 class WebRTCManager {
+  private queryClient: QueryClient | null = null;
   private connections: Map<number, MediaStream> = new Map();
   private peerConnections: Map<number, RTCPeerConnection> = new Map();
   private webSockets: Map<number, WebSocket> = new Map();
@@ -10,6 +16,15 @@ class WebRTCManager {
 
   constructor() {
     this.initializeSignalingSocket();
+  }
+  setQueryClient(queryClient: QueryClient) {
+    this.queryClient = queryClient;
+  }
+
+  private updateCameraStatus(cameraId: number, status: 'online' | 'offline') {
+    if (this.queryClient) {
+      updateCameraInCache(this.queryClient, cameraId, { status });
+    }
   }
 
   private initializeSignalingSocket() {
@@ -75,16 +90,13 @@ class WebRTCManager {
   }
 
   async getStream(cameraId: number): Promise<MediaStream | null> {
-    console.log(`Requesting stream for camera ${cameraId}`);
-
-    // Return existing stream if available
     if (this.connections.has(cameraId)) {
+      updateCameraInCache(this.queryClient!, cameraId, { status: 'online' });
       const stream = this.connections.get(cameraId)!;
-      // Verify stream is still active
       if (stream.active) {
         return stream;
       } else {
-        // Clean up inactive stream
+        updateCameraInCache(this.queryClient!, cameraId, { status: 'offline' });
         this.releaseStream(cameraId);
       }
     }
@@ -93,17 +105,24 @@ class WebRTCManager {
       const stream = await this.connectToWebRtcStream(cameraId);
       if (stream) {
         this.connections.set(cameraId, stream);
-        this.reconnectAttempts.delete(cameraId); // Reset reconnect attempts on success
+        this.reconnectAttempts.delete(cameraId);
+        // Update camera status to online when stream is active
+        this.updateCameraStatus(cameraId, 'online');
       }
       return stream;
     } catch (error) {
       console.error(`Failed to get stream for camera ${cameraId}:`, error);
+      // Update camera status to offline when stream fails
+      this.updateCameraStatus(cameraId, 'offline');
       return null;
     }
   }
 
   releaseStream(cameraId: number) {
     console.log(`Releasing stream for camera ${cameraId}`);
+
+    // Update camera status to offline when releasing stream
+    this.updateCameraStatus(cameraId, 'offline');
 
     // Close MediaStream
     const stream = this.connections.get(cameraId);
@@ -282,12 +301,18 @@ class WebRTCManager {
           cleanup();
           this.cleanup(cameraId, ws, peerConnection);
 
+          // Update camera status to offline when connection fails
+          this.updateCameraStatus(cameraId, 'offline');
+
           // Increment reconnect attempts
           this.reconnectAttempts.set(cameraId, attempts + 1);
 
           reject(
             new Error(`WebRTC connection ${state} for camera ${cameraId}`)
           );
+        } else if (state === 'connected') {
+          // Update camera status to online when connection is established
+          this.updateCameraStatus(cameraId, 'online');
         }
       };
 

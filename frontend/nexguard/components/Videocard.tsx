@@ -1,20 +1,15 @@
 import { Wifi, MoreHorizontal } from 'lucide-react'
-import { connectToWebRtcStream } from '@/lib/services/webrtc_service';
 import { useEffect } from 'react';
 import React from 'react';
-import { useQueryClient } from '@tanstack/react-query';
 import { Camera } from '@/Types';
 import { webRTCManager } from '@/lib/services/webrtc_manager';
 
-//TODO:Bug: The video stream drops when the first time when trying to connect to the backend.
 //TODO: Figure how to handle video streams better,
-//TODO: Change camera_id -> CameraId in the Camera interface
 //the video should not drop when the user switches to a new view
 
 
 const Videocard = ({ camera }: { camera: Camera }) => {
   const videoRef = React.useRef<HTMLVideoElement>(null);
-  const queryClient = useQueryClient();
   const timestamp = new Date().toLocaleString('en-US', { 
     month: '2-digit', 
     day: '2-digit', 
@@ -29,7 +24,6 @@ useEffect(() => {
     let isCancelled = false;
 
     const init = async () => {
-      console.log(`Initializing video stream for camera ${camera.cameraId}`);
       if(!camera.enabled || !camera.cameraId) return;
       try{
         const stream = await webRTCManager.getStream(camera.cameraId);
@@ -38,13 +32,7 @@ useEffect(() => {
         if(videoElement){
           videoElement.srcObject = stream;
           videoElement.onloadedmetadata = () => {
-            videoElement.play()
-              .then(() => updateCameraStatusInCache(camera.cameraId, 'online'))
-              .catch(() => {
-                if (camera.status !== 'offline') {
-                  updateCameraStatusInCache(camera.cameraId, 'offline');
-                }
-              });
+            videoElement.play();
           }
         }
       }
@@ -61,18 +49,6 @@ useEffect(() => {
       }
     }
   }, [camera.cameraId, camera.enabled, camera.status]);
-
-  const updateCameraStatusInCache = (cameraId: number, status: 'online' | 'offline') => {
-  queryClient.setQueryData<Camera[]>(['cameras'], (prev) =>
-    prev?.map((cam) => {
-      if (cam.cameraId === cameraId) {
-        console.log(`Updated camera ${cameraId} status to ${status}`);
-        return { ...cam, status };
-      }
-      return cam;
-    }) || []
-  );
-};
 
   return (
     <div className="group relative aspect-video w-full overflow-hidden rounded-xl shadow-lg">

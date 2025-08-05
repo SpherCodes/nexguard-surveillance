@@ -43,14 +43,13 @@ const CameraForm = ({ initialData, onSubmit, onDelete , onCreateZone, zones = []
         ...initialData,
         ...data,
     };
-    console.log('Submitting Camera Form:', payload);
-    onSubmit(payload, payload?.camera_id);
+    console.log('Submitting camera data:', payload);
+    onSubmit(payload, payload?.cameraId);
   };
 
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-        {/* --- Card 1: General Information --- */}
         <Card>
           <CardHeader>
             <CardTitle>General Information</CardTitle>
