@@ -62,6 +62,7 @@ export async function updateCamera(
   id: number,
   updates: Camera): Promise<Camera> {
   try {
+    console.log('Updating camera:', { id, updates });
     const url = `${API_BASE_URL}/api/v1/cameras/${id}`;
     const payload = {
       name: updates.name,
@@ -141,16 +142,19 @@ export async function getDetectionEventsByDay(day: Date) {
   if (!day) {
     throw new Error('Day parameter is required');
   }
+
   try {
     const formattedDate = day.toISOString().split('T')[0];
     console.log(`Fetching events for date: ${formattedDate}`);
     const url = `${API_BASE_URL}/api/v1/detections/date/${formattedDate}`;
+    const headers = {
+      'Content-Type': 'application/json',
+    };
 
-    const response = await fetch(url);
-
-    console.log(`Data: ${JSON.stringify(response)}`);
+    const response = await fetch(url, { headers });
 
     if (response.status === 404) {
+      console.log(`No events found for date: ${formattedDate}`);
       return [];
     }
 
@@ -160,28 +164,31 @@ export async function getDetectionEventsByDay(day: Date) {
         `Failed to fetch detection events: ${response.status} ${response.statusText} - ${errorData}`
       );
     }
-    const raw = await response.json();
 
-    return Array.isArray(raw)
-      ? raw.map(
+    const data = await response.json();
+    console.log('API raw response:', data);
+
+    return Array.isArray(data)
+      ? data.map(
           (event: any): DetectionEvent => ({
             id: event.id,
             cameraId: event.camera_id,
-        timestamp: new Date(event.timestamp),
-        confidence: event.confidence,
-        image_media: event.image_media
-          ? event.image_media.map((img: any) => ({
-              cameraId: img.camera_id,
-              detectionId: img.detection_id,
-              imageData: img.image_data,
-              createdAt: new Date(img.created_at),
-              media_path: img.media_path
-            }))
-          : []
-      })
-      )
+            timestamp: new Date(event.timestamp * 1000),
+            confidence: event.confidence,
+            image_media: event.image_media
+              ? event.image_media.map((img: any) => ({
+                  cameraId: img.camera_id,
+                  detectionId: img.detection_id,
+                  imageData: img.image_data,
+                  createdAt: new Date(img.created_at),
+                  media_path: img.media_path
+                }))
+              : []
+          })
+        )
       : [];
   } catch (error) {
+    console.error('Error in getDetectionEventsByDay:', error);
     throw error;
   }
 }

@@ -52,10 +52,10 @@ function CameraSettings() {
     cameras.find(c => c.cameraId === selectedCameraId) || null,
     [cameras, selectedCameraId]
   );
-
   const { mutate: saveCameraMutate, isPending: isSaving } = useMutation({
-    mutationFn: ({ data, id }: { data: Camera, id?: number }) =>
-      id ? updateCamera(id, data) : createCamera(data),
+    mutationFn: ({ data, id }: { data: Camera, id?: number }) => {
+      return id ? updateCamera(id, data) : createCamera(data);
+    },
     onSuccess: (savedCamera) => {
       queryClient.invalidateQueries({ queryKey: ['cameras'] });
       setIsAdding(false);

@@ -3,7 +3,6 @@ import React from 'react'
 import Image from 'next/image'
 
 const FeedCard = ({ alertEvent }: FeedProps) => {
-  // prepare data URI for base64 thumbnail
   const thumbnailBase64 = alertEvent.image_media?.[0]?.imageData;
   const thumbnailSrc = thumbnailBase64
     ? thumbnailBase64.startsWith('data:')

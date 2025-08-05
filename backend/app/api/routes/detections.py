@@ -13,7 +13,7 @@ from ...schema import (
 )
 
 from ...utils.detection_manager import DetectionEventManager
-from ...dependencies import DatabaseDep, get_detection_event_manager, get_db
+from ...dependencies import DatabaseDep, get_db
 
 router = APIRouter()
 
@@ -23,6 +23,7 @@ async def get_recent_detections(
     db: DatabaseDep
 ):
     """Get recent detections with images by date"""
+    print(f"Fetching detections for date: {date}")
     try:
         detections = detection_service.get_by_date(
         db=db,
@@ -33,7 +34,7 @@ async def get_recent_detections(
             status_code=500,
             detail=f"Failed to retrieve detections: {str(e)}"
         )
-        
+    
     return detections
 
 @router.get("/stats")

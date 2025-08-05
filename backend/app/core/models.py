@@ -33,8 +33,8 @@ class Camera(Base):
 
     # Relationships
     zone = relationship("Zone", back_populates="cameras")
-    detections = relationship("Detection", back_populates="camera", cascade="all, delete")
-    media = relationship("Media", back_populates="camera", cascade="all, delete")
+    detections = relationship("Detection", back_populates="camera")
+    media = relationship("Media", back_populates="camera")
 
 
 class Detection(Base):
