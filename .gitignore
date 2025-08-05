@@ -237,10 +237,6 @@ tensorboard_logs/
 *.swo
 *~
 
-# Package managers
-package-lock.json
-yarn.lock
-
 # Build artifacts
 build/
 dist/

@@ -12,19 +12,16 @@ import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 import { useState } from 'react';
 import { systemSettingsNav } from '@/constants';
-import { Loader2, Save, Plus, Crown, User, MoreVertical, Trash2 } from 'lucide-react';
+import { Loader2, Save } from 'lucide-react';
 import { InfrenceFormProps, StorageFormProps} from '@/Types';
 import { getInferenceSettings, getSystemStorageSettings, updateInferenceSettings, updateStorageSettings} from '@/lib/actions/api.actions';
 
 const SystemSettings = () => {
   const [activeSection, setActiveSection] = useState('inference');
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: inferenceSettings } = useQuery({
@@ -60,13 +57,31 @@ const SystemSettings = () => {
   const renderActivePanel = () => {
     if (isLoading || !inferenceSettings || !storageSettings) {
       return (
-        <Card>
-          <CardHeader><div className="h-6 w-1/2 rounded-md bg-gray-200 animate-pulse" /></CardHeader>
-          <CardContent className="space-y-4">
-            <div className="h-10 w-full rounded-md bg-gray-200 animate-pulse" />
-            <div className="h-10 w-full rounded-md bg-gray-200 animate-pulse" />
-          </CardContent>
-        </Card>
+        <div className="space-y-6">
+          <div className="space-y-1">
+            <div className="h-7 w-1/2 rounded-md bg-gray-200 animate-pulse" />
+            <div className="h-4 w-3/4 rounded-md bg-gray-200 animate-pulse" />
+          </div>
+          
+          <Card className="border-gray-200 shadow-sm">
+            <CardHeader className="bg-gradient-to-r from-gray-50 to-white border-b border-gray-100">
+              <div className="space-y-2">
+                <div className="h-6 w-1/3 rounded-md bg-gray-200 animate-pulse" />
+                <div className="h-4 w-2/3 rounded-md bg-gray-200 animate-pulse" />
+              </div>
+            </CardHeader>
+            <CardContent className="p-6 space-y-6">
+              <div className="space-y-4">
+                <div className="h-4 w-1/4 rounded-md bg-gray-200 animate-pulse" />
+                <div className="h-11 w-full rounded-md bg-gray-200 animate-pulse" />
+              </div>
+              <div className="space-y-4">
+                <div className="h-4 w-1/4 rounded-md bg-gray-200 animate-pulse" />
+                <div className="h-11 w-full rounded-md bg-gray-200 animate-pulse" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       );
     }
 
@@ -94,31 +109,53 @@ const SystemSettings = () => {
   };
 
   return (
-    <div className="grid grid-cols-1 gap-8 md:grid-cols-4">
-      <div className="md:col-span-1">
-        <h2 className="mb-4 text-lg font-semibold text-gray-800">System</h2>
-        <nav className="space-y-1">
-          {systemSettingsNav.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => setActiveSection(item.id)}
-              className={cn(
-                'flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm font-medium transition-colors',
-                activeSection === item.id
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-gray-600 hover:bg-accent hover:text-accent-foreground'
-              )}
-            >
-              <item.icon className="h-5 w-5" />
-              <span>{item.label}</span>
-            </button>
-          ))}
-        </nav>
+    <div className="grid grid-cols-1 gap-8 lg:grid-cols-3 h-full">
+      {/* Enhanced Navigation Sidebar */}
+      <div className="flex flex-col gap-6 lg:col-span-1">
+        <div className="space-y-6">
+          <div className="space-y-1">
+            <h2 className="text-2xl font-bold text-gray-900">System Configuration</h2>
+            <p className="text-sm text-gray-600">Manage core system settings and preferences</p>
+          </div>
+          
+          <nav className="space-y-2">
+            {systemSettingsNav.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => setActiveSection(item.id)}
+                className={cn(
+                  'flex w-full items-center gap-4 rounded-xl px-4 py-3 text-left font-semibold transition-all duration-200',
+                  'hover:shadow-md hover:-translate-y-0.5',
+                  activeSection === item.id
+                    ? 'bg-gradient-to-r from-gray-900 to-gray-800 text-white shadow-lg'
+                    : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300'
+                )}
+              >
+                <div className={cn(
+                  'p-2 rounded-lg transition-colors',
+                  activeSection === item.id
+                    ? 'bg-white/20'
+                    : 'bg-gray-100'
+                )}>
+                  <item.icon className={cn(
+                    'h-5 w-5',
+                    activeSection === item.id ? 'text-white' : 'text-gray-600'
+                  )} />
+                </div>
+                <span className="text-sm">{item.label}</span>
+              </button>
+            ))}
+          </nav>
+        </div>
       </div>
 
-      {/* Right Column: Content Panel */}
-      <div className="md:col-span-3">
-        {renderActivePanel()}
+      {/* Enhanced Content Panel */}
+      <div className="lg:col-span-2">
+        <div className="bg-gradient-to-br from-gray-50 to-white rounded-2xl border border-gray-200 shadow-sm h-full overflow-hidden">
+          <div className="p-6 h-full">
+            {renderActivePanel()}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -131,38 +168,69 @@ export default SystemSettings;
   const form = useForm<InferenceFormData>({ resolver: zodResolver(inferenceSchema), defaultValues: initialData });
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(data => onSave(data))} className="space-y-8">
-        <Card>
-            <CardHeader>
-                <CardTitle>Inference Settings</CardTitle>
-                <CardDescription>Configure the AI model and detection confidence.</CardDescription>
+      <form onSubmit={form.handleSubmit(data => onSave(data))} className="space-y-8 h-full">
+        <div className="space-y-6">
+          <div className="space-y-1">
+            <h3 className="text-xl font-bold text-gray-900">AI Detection Settings</h3>
+            <p className="text-sm text-gray-600">Configure the AI model and detection confidence</p>
+          </div>
+          
+          <Card className="border-gray-200 shadow-sm">
+            <CardHeader className="bg-gradient-to-r from-gray-50 to-white border-b border-gray-100">
+              <CardTitle className="text-lg text-gray-900">Model Configuration</CardTitle>
+              <CardDescription className="text-gray-600">Choose your detection model and confidence settings</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-                <FormField control={form.control} name="model" render={({ field }) => (
-                <FormItem>
-                    <FormLabel>Detection Model</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl><SelectTrigger><SelectValue placeholder="Choose a model" /></SelectTrigger></FormControl>
+            <CardContent className="p-6 space-y-8">
+              <FormField control={form.control} name="model" render={({ field }) => (
+                <FormItem className="space-y-3">
+                  <FormLabel className="text-sm font-semibold text-gray-900">Detection Model</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger className="h-11 border-gray-300 bg-white hover:border-gray-400 focus:border-gray-900 transition-colors">
+                        <SelectValue placeholder="Choose a model" />
+                      </SelectTrigger>
+                    </FormControl>
                     <SelectContent>
-                        <SelectItem value="yolov11n">YOLOv11 Nano (Fastest)</SelectItem>
-                        <SelectItem value="yolov11s">YOLOv11 Small (Balanced)</SelectItem>
+                      <SelectItem value="yolov11n">YOLOv11 Nano (Fastest)</SelectItem>
+                      <SelectItem value="yolov11s">YOLOv11 Small (Balanced)</SelectItem>
                     </SelectContent>
-                    </Select>
-                    <FormDescription>Choose the AI model for object detection.</FormDescription>
+                  </Select>
+                  <FormDescription className="text-gray-600">Choose the AI model for object detection performance</FormDescription>
                 </FormItem>
-                )} />
-                <FormField control={form.control} name="min_detection_threshold" render={({ field }) => (
-                <FormItem>
-                    <FormLabel>Confidence Threshold: {field.value * 100}%</FormLabel>
-                    <FormControl><Slider defaultValue={[field.value * 100]} max={100} step={1} onValueChange={(v) => field.onChange(v[0] / 100)} /></FormControl>
-                    <FormDescription>Only create events for detections above this confidence level.</FormDescription>
+              )} />
+              
+              <FormField control={form.control} name="min_detection_threshold" render={({ field }) => (
+                <FormItem className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <FormLabel className="text-sm font-semibold text-gray-900">Confidence Threshold</FormLabel>
+                    <div className="text-sm font-mono bg-gray-100 px-3 py-1 rounded-md text-gray-900">
+                      {Math.round(field.value * 100)}%
+                    </div>
+                  </div>
+                  <FormControl>
+                    <Slider 
+                      defaultValue={[field.value * 100]} 
+                      max={100} 
+                      step={1} 
+                      onValueChange={(v) => field.onChange(v[0] / 100)}
+                      className="py-4"
+                    />
+                  </FormControl>
+                  <FormDescription className="text-gray-600">Only create events for detections above this confidence level</FormDescription>
                 </FormItem>
-                )} />
+              )} />
             </CardContent>
-        </Card>
-        <div className="flex justify-end">
-          <Button type="submit" disabled={!form.formState.isDirty}>
-            {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} Save Changes
+          </Card>
+        </div>
+        
+        <div className="flex justify-end pt-4 border-t border-gray-200">
+          <Button 
+            type="submit" 
+            disabled={!form.formState.isDirty}
+            className="bg-gray-900 hover:bg-gray-800 text-white px-6 h-11 font-semibold transition-all duration-200 shadow-sm hover:shadow-md"
+          >
+            {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} 
+            Save Changes
           </Button>
         </div>
       </form>
@@ -184,98 +252,70 @@ const StorageForm = ({
   console.log('StorageForm initialData:', initialData);
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(data => onSave(data))} className="space-y-8">
-        <Card>
-            <CardHeader>
-                <CardTitle>Storage Settings</CardTitle>
-                <CardDescription>Manage where recordings are saved and for how long.</CardDescription>
+      <form onSubmit={form.handleSubmit(data => onSave(data))} className="space-y-8 h-full">
+        <div className="space-y-6">
+          <div className="space-y-1">
+            <h3 className="text-xl font-bold text-gray-900">Storage Management</h3>
+            <p className="text-sm text-gray-600">Configure where recordings are saved and retention policies</p>
+          </div>
+          
+          <Card className="border-gray-200 shadow-sm">
+            <CardHeader className="bg-gradient-to-r from-gray-50 to-white border-b border-gray-100">
+              <CardTitle className="text-lg text-gray-900">Storage Configuration</CardTitle>
+              <CardDescription className="text-gray-600">Manage storage location and data retention settings</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-                <FormField control={form.control} name="storageType" render={({ field }) => (
-                <FormItem>
-                    <FormLabel>Storage Type</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl><SelectTrigger><SelectValue placeholder="Choose storage" /></SelectTrigger></FormControl>
+            <CardContent className="p-6 space-y-8">
+              <FormField control={form.control} name="storageType" render={({ field }) => (
+                <FormItem className="space-y-3">
+                  <FormLabel className="text-sm font-semibold text-gray-900">Storage Type</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger className="h-11 border-gray-300 bg-white hover:border-gray-400 focus:border-gray-900 transition-colors">
+                        <SelectValue placeholder="Choose storage" />
+                      </SelectTrigger>
+                    </FormControl>
                     <SelectContent>
-                        <SelectItem value="local">Local Storage</SelectItem>
-                        <SelectItem value="cloud">Cloud Storage</SelectItem>
+                      <SelectItem value="local">Local Storage</SelectItem>
+                      <SelectItem value="cloud">Cloud Storage</SelectItem>
                     </SelectContent>
-                    </Select>
+                  </Select>
+                  <FormDescription className="text-gray-600">Select where recordings will be stored</FormDescription>
                 </FormItem>
-                )} />
-                <FormField control={form.control} name="retentionDays" render={({ field }) => (
-                <FormItem>
-                    <FormLabel>Retention Period</FormLabel>
-                    <Select onValueChange={(v) => field.onChange(Number(v))} defaultValue={String(field.value)}>
-                    <FormControl><SelectTrigger><SelectValue placeholder="Select retention" /></SelectTrigger></FormControl>
+              )} />
+              
+              <FormField control={form.control} name="retentionDays" render={({ field }) => (
+                <FormItem className="space-y-3">
+                  <FormLabel className="text-sm font-semibold text-gray-900">Retention Period</FormLabel>
+                  <Select onValueChange={(v) => field.onChange(Number(v))} defaultValue={String(field.value)}>
+                    <FormControl>
+                      <SelectTrigger className="h-11 border-gray-300 bg-white hover:border-gray-400 focus:border-gray-900 transition-colors">
+                        <SelectValue placeholder="Select retention" />
+                      </SelectTrigger>
+                    </FormControl>
                     <SelectContent>
-                        <SelectItem value="7">7 Days</SelectItem>
-                        <SelectItem value="14">14 Days</SelectItem>
-                        <SelectItem value="30">30 Days</SelectItem>
+                      <SelectItem value="7">7 Days</SelectItem>
+                      <SelectItem value="14">14 Days</SelectItem>
+                      <SelectItem value="30">30 Days</SelectItem>
                     </SelectContent>
-                    </Select>
-                    <FormDescription>Automatically delete recordings older than this period.</FormDescription>
+                  </Select>
+                  <FormDescription className="text-gray-600">Automatically delete recordings older than this period</FormDescription>
                 </FormItem>
-                )} />
+              )} />
             </CardContent>
-        </Card>
-        <div className="flex justify-end">
-          <Button type="submit" disabled={isLoading || !form.formState.isDirty}>
-            {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} Save Changes
+          </Card>
+        </div>
+        
+        <div className="flex justify-end pt-4 border-t border-gray-200">
+          <Button 
+            type="submit" 
+            disabled={isLoading || !form.formState.isDirty}
+            className="bg-gray-900 hover:bg-gray-800 text-white px-6 h-11 font-semibold transition-all duration-200 shadow-sm hover:shadow-md"
+          >
+            {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} 
+            Save Changes
           </Button>
         </div>
       </form>
     </Form>
   );
 };
-
-// --- Access Control Panel ---
-const AccessControlPanel = ({ initialData }: UserFormProps) => (
-    <Card>
-        <CardHeader>
-            <div className="flex items-center justify-between">
-                <div>
-                    <CardTitle>Access Control</CardTitle>
-                    <CardDescription>Manage who has access to your system and their permissions.</CardDescription>
-                </div>
-                <Button size="sm"><Plus className="mr-2 h-4 w-4" /> Invite User</Button>
-            </div>
-        </CardHeader>
-        <CardContent>
-            <div className="space-y-3">
-                {initialData.map(user => (
-                    <div key={user.id} className="flex items-center justify-between rounded-lg border p-4 dark:border-gray-700">
-                        <div className="flex items-center gap-4">
-                            <Avatar>
-                                <AvatarFallback>{user.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
-                            </Avatar>
-                            <div>
-                                <p className="font-semibold text-gray-900 dark:text-gray-100">{user.name}</p>
-                                <p className="text-sm text-gray-500 dark:text-gray-400">{user.email}</p>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-4">
-                            <Badge variant={user.role === 'admin' ? 'default' : 'secondary'} className={cn(user.role === 'admin' && 'bg-amber-100 text-amber-800 hover:bg-amber-100/80 dark:bg-amber-900/50 dark:text-amber-300')}>
-                                {user.role === 'admin' ? <Crown className="mr-1.5 h-3.5 w-3.5" /> : <User className="mr-1.5 h-3.5 w-3.5" />}
-                                <span className="capitalize">{user.role}</span>
-                            </Badge>
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-500">
-                                        <MoreVertical className="h-4 w-4" />
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                    {/* <DropdownMenuItem><Edit className="mr-2 h-4 w-4" /> Edit Permissions</DropdownMenuItem> */}
-                                    <DropdownMenuItem className="text-red-600 focus:bg-red-50 focus:text-red-600">
-                                        <Trash2 className="mr-2 h-4 w-4" /> Remove User
-                                    </DropdownMenuItem>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-                        </div>
-                    </div>
-                ))}
-            </div>
-        </CardContent>
-    </Card>
-);
