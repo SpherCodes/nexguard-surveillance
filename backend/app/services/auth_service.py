@@ -164,11 +164,10 @@ class AuthService(CRUDBase[User, UserCreate, UserUpdate]):
                 detail="User not found"
             )
         
-        # If password is being updated, hash it
         try:
-            update_data = user_data.model_dump(exclude_unset=True)  # Pydantic v2
+            update_data = user_data.model_dump(exclude_unset=True) 
         except AttributeError:
-            update_data = user_data.dict(exclude_unset=True)  # Pydantic v1
+            update_data = user_data.model_dump(exclude_unset=True) 
         if 'password' in update_data:
             update_data['password'] = self.hash_password(update_data['password'])
         

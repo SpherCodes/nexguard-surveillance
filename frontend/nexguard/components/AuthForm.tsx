@@ -1,20 +1,25 @@
 'use client'
 import { signIn, signUp } from '@/lib/actions/user.actions';
 import { authFormSchema } from '@/lib/utils';
-import { zodResolver } from '@hookform/resolvers/zod/dist/zod.js';
-import { useRouter } from 'next/dist/client/components/navigation';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useRouter } from 'next/navigation'; // Fixed import
 import React, { useState } from 'react'
-import { useForm } from 'react-hook-form'; // Add FormProvider
+import { useForm } from 'react-hook-form';
 import CustomInput from './CustomInput';
-import { Form } from '@/components/ui/form'; // Import your Form component
+import { Form } from '@/components/ui/form';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 const AuthForm = ({type}: {type: 'Sign-in' | 'Sign-up'}) => {
     const router = useRouter();
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [success, setSuccess] = useState<string | null>(null);
 
     const formSchema = authFormSchema(type);
     
-    const form = useForm({
+    // Use Record<string, unknown> for form data to handle both sign-in and sign-up
+    const form = useForm<Record<string, unknown>>({
+        // @ts-expect-error - Complex union type handling with zod resolver
         resolver: zodResolver(formSchema),
         defaultValues: {
             userName: '',
@@ -34,34 +39,68 @@ const AuthForm = ({type}: {type: 'Sign-in' | 'Sign-up'}) => {
     const onSubmit = async (data: Record<string, unknown>) => {
         console.log('Form submitted with data:', data);
         setLoading(true);
+        setError(null);
+        setSuccess(null);
+
         try {
-            if(type == 'Sign-up') {
+            if(type === 'Sign-up') {
                 const userData = {
                     userName: data.userName as string,
                     firstName: data.firstName as string,
                     lastName: data.lastName as string,
-                    middleName: data.middleName as string,
+                    middleName: (data.middleName as string) || '',
                     password: data.password as string,
                     phoneNumber: data.phoneNumber as string,
                     email: data.email as string,
                 }
-                await signUp(userData);
-                router.push('/sign-in');
+
+                const newUser = await signUp(userData);
+                console.log('User registered successfully:', newUser);
+                
+                setSuccess('Account created successfully! Redirecting to dashboard...');
+                setTimeout(() => {
+                    router.push('/');
+                }, 1500);
             }
             else {
-                console.log('submitting sign-in form with data:', data);
-                const signInData = {
+                console.log('Submitting sign-in form with data:', data);
+                const loginData = {
                     userName: data.userName as string,
                     password: data.password as string,
                 }
-                const loggedInUser = await signIn(signInData);
+
+                const loggedInUser = await signIn(loginData);
+                console.log('User logged in successfully:', loggedInUser);
 
                 if(loggedInUser) {
-                    router.push('/');
+                    setSuccess('Login successful! Redirecting...');
+                    setTimeout(() => {
+                        router.push('/');
+                    }, 1000);
+                } else {
+                    setError('Login failed. Please check your credentials.');
                 }
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error('Authentication failed:', error);
+            
+            let errorMessage = 'An unexpected error occurred. Please try again.';
+            
+            if (error?.message) {
+                errorMessage = error.message;
+            } else if (typeof error === 'string') {
+                errorMessage = error;
+            }
+            
+            if (errorMessage.includes('Failed to sign in: 401')) {
+                errorMessage = 'Invalid username or password. Please try again.';
+            } else if (errorMessage.includes('Failed to sign up: 400')) {
+                errorMessage = 'This username or email may already be taken. Please try different credentials.';
+            } else if (errorMessage.includes('Failed to sign up: 422')) {
+                errorMessage = 'Please check all required fields and try again.';
+            }
+            
+            setError(errorMessage);
         } finally {
             setLoading(false);
         }
@@ -150,7 +189,6 @@ const AuthForm = ({type}: {type: 'Sign-in' | 'Sign-up'}) => {
             {/* Right Side - Authentication Form */}
             <div className="flex-1 lg:w-1/2 flex items-center justify-center p-6 bg-gray-50">
                 <div className="w-full max-w-lg">
-                    {/* Mobile Logo (shown only on small screens) */}
                     <div className="lg:hidden text-center mb-8">
                         <div className="mx-auto w-16 h-16 bg-gradient-to-r from-gray-900 to-gray-700 rounded-2xl flex items-center justify-center mb-4">
                             <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -161,7 +199,6 @@ const AuthForm = ({type}: {type: 'Sign-in' | 'Sign-up'}) => {
                         <h1 className="text-2xl font-bold text-gray-900">NexGuard</h1>
                     </div>
 
-                    {/* Form Header */}
                     <div className="text-center mb-6">
                         <h2 className="text-2xl font-bold text-gray-900 mb-2">
                             {type === 'Sign-in' ? 'Welcome Back' : 'Create Account'}
@@ -173,6 +210,23 @@ const AuthForm = ({type}: {type: 'Sign-in' | 'Sign-up'}) => {
                             }
                         </p>
                     </div>
+
+                    {/* Success/Error Messages */}
+                    {error && (
+                        <Alert className="mb-4 border-red-200 bg-red-50">
+                            <AlertDescription className="text-red-800">
+                                {error}
+                            </AlertDescription>
+                        </Alert>
+                    )}
+
+                    {success && (
+                        <Alert className="mb-4 border-green-200 bg-green-50">
+                            <AlertDescription className="text-green-800">
+                                {success}
+                            </AlertDescription>
+                        </Alert>
+                    )}
 
                     {/* Form Card */}
                     <div className="bg-white rounded-3xl shadow-2xl border border-gray-200 p-6 relative overflow-hidden">

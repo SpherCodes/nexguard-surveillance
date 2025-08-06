@@ -5,6 +5,7 @@ import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import z from 'zod';
 import { Camera } from '@/Types';
+import { getCurrentUser } from './actions/user.actions';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -32,6 +33,14 @@ export function updateCameraInCache(
   });
 }
 
+export const checkAuthStatus = async () => {
+    try {
+      const currentUser = await getCurrentUser();
+      return currentUser;
+    } catch (error) {
+      return null;
+    }
+  };
 /**
  * Hook-based version that provides the queryClient automatically
  * Use this in React components
