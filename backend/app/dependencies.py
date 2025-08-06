@@ -62,6 +62,12 @@ def get_detection_event_manager():
         _detection_manager = DetectionEventManager()
     return _detection_manager
 
+#TODO: fix the use of Session 
+"""Manages persistence operations for ORM-mapped objects.
+
+The _orm.Session is not safe for use in concurrent threads.. See session_faq_threadsafe for background.
+
+The Session's usage paradigm is described at /orm/session."""
 DatabaseDep = Annotated[Session, Depends(get_database_session)]
 CameraServiceDep = Annotated[object, Depends(get_camera_service)]
 ZoneServiceDep = Annotated[object, Depends(get_zone_service)]

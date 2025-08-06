@@ -30,6 +30,7 @@ class CameraUpdate(BaseModel):
     enabled: Optional[bool] = None
 
 
+
 class Camera(CameraBase):
     """Complete camera schema with database fields"""
     id: int

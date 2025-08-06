@@ -1,14 +1,23 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { getCameras, getZones } from '@/lib/actions/api.actions'
-import { cn } from '@/lib/utils'
+import { checkAuthStatus, cn } from '@/lib/utils'
 import { Camera as CameraIcon } from 'lucide-react'
 import Videocard from '@/components/Videocard'
 import { useQuery } from '@tanstack/react-query'
+import { User } from '@/Types'
 
 function Home() {
   const [activeZoneId, setActiveZoneId] = useState<number>(0)
+  const [user, setUser] = useState<User | null>(null)
+  
+  useEffect(() => {
+    if (user === null) {
+      checkAuthStatus().then(setUser);
+    }
+  }, [user]);
+
   const {
     data: zones = [],
     isLoading: zonesLoading,
