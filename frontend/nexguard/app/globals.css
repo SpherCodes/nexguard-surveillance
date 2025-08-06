@@ -24,6 +24,17 @@
     display: none;
   }
 
+ollbar utility */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Home - includes scrollbar hiding */
   .home {
     @apply flex w-full flex-row max-xl:max-h-screen max-xl:overflow-y-scroll;
     -ms-overflow-style: none;

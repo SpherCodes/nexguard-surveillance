@@ -60,3 +60,42 @@ export const storageSchema = z.object({
   storageType: z.enum(['local', 'cloud']),
   retentionDays: z.number()
 });
+
+export const authFormSchema = (type: 'Sign-up' | 'Sign-in') => {
+  if (type === 'Sign-in') {
+    return z.object({
+      userName: z.string().min(1, { message: 'Username is required.' }),
+      password: z.string().min(1, { message: 'Password is required.' })
+    });
+  }
+
+  return z
+    .object({
+      userName: z
+        .string()
+        .min(6, { message: 'Username must be at least 6 characters.' }),
+      firstName: z
+        .string()
+        .min(2, { message: 'First name must be at least 2 characters.' }),
+      lastName: z
+        .string()
+        .min(2, { message: 'Last name must be at least 2 characters.' }),
+      middleName: z.string().optional(),
+      password: z
+        .string()
+        .min(6, { message: 'Password must be at least 6 characters.' }),
+      confirmPassword: z
+        .string()
+        .min(6, { message: 'Confirm Password must match.' }),
+      email: z.string().email({ message: 'Invalid email address.' }),
+      phoneNumber: z
+        .string()
+        .min(10, { message: 'Phone number must be at least 10 digits.' }),
+      acceptTerms: z.boolean().refine((val) => val, {
+        message: 'You must accept the terms and conditions.'
+      })
+    })
+    .refine((data) => data.password === data.confirmPassword, {
+      message: "Passwords don't match"
+    });
+};

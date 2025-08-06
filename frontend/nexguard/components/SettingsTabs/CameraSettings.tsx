@@ -16,8 +16,6 @@ import {
   Camera as CameraIcon,
   Wifi,
   WifiOff,
-  MoreVertical,
-  Edit3
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';

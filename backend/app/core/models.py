@@ -88,3 +88,16 @@ class StorageSettings(Base):
     storage_type = Column(String, default="local")
     retention_days = Column(Integer, default=30)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+    
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    firstname = Column(String(50), nullable=False)
+    lastname = Column(String(50), nullable=False)
+    middlename = Column(String(50), nullable=True)
+    username = Column(String(50), unique=True, index=True, nullable=False)
+    email = Column(String(100), unique=True, index=True, nullable=False)
+    password = Column(String, nullable=False)
+    phone = Column(String(20), nullable=True)
+    is_active = Column(Boolean, default=True)

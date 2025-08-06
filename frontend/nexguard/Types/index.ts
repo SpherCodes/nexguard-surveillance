@@ -1,3 +1,4 @@
+import { signIn } from './../lib/actions/user.actions';
 import { cameraFormSchema } from '@/lib/utils';
 import z from 'zod';
 
@@ -100,6 +101,21 @@ interface CameraSettingsProps {
   cameras: Camera[];
 }
 
+interface signInProps {
+  email: string;
+  password: string;
+}
+
+interface SignUpProps{
+  userName: string;
+  firstName: string;
+  lastName: string;
+  password: string;
+  email?: string;
+  phoneNumber?: string;
+  acceptTerms?: boolean;
+}
+
 export type {
   Camera,
   CameraFormData,
@@ -114,4 +130,6 @@ export type {
   StorageFormProps,
   WebRTCConfig,
   WebRTCConnection,
+  signInProps,
+  SignUpProps,
 };
