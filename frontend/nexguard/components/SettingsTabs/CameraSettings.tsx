@@ -136,15 +136,32 @@ function CameraSettings() {
             {/* Search and Filter */}
             <div className="space-y-3">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                <Input
-                  placeholder="Search cameras..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 bg-gray-50 border-gray-200 focus:bg-white"
-                />
               </div>
-              
+              <div className="flex gap-2 items-center">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                  <Input
+                    placeholder="Search cameras..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10 bg-gray-50 border-gray-200 focus:bg-white"
+                  />
+                </div>
+                <Button
+                  onClick={handleAddClick}
+                  disabled={isSaving && isAdding}
+                  size="sm"
+                  className="bg-black hover:bg-gray-800 text-white px-3 h-8 rounded-lg font-medium transition-all duration-200 shadow-sm hover:shadow-md"
+                  title="Add Camera"
+                >
+                  {isSaving && isAdding ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Plus className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+              <div className="flex gap-2 mt-3"></div>
               <div className="flex gap-2">
                 <Button
                   variant={statusFilter === 'all' ? 'default' : 'outline'}
@@ -189,19 +206,6 @@ function CameraSettings() {
                 </Button>
               </div>
             </div>
-            
-            <Button 
-              onClick={handleAddClick} 
-              disabled={isSaving && isAdding} 
-              className="w-full bg-black hover:bg-gray-800 text-white py-3 rounded-lg font-medium transition-all duration-200 shadow-sm hover:shadow-md"
-            >
-              {isSaving && isAdding ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Plus className="mr-2 h-4 w-4" />
-              )}
-              Add New Camera
-            </Button>
           </div>
 
           <div className="flex-1 min-h-0">

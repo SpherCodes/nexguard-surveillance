@@ -11,6 +11,7 @@ import { User } from '@/Types'
 function Home() {
   const [activeZoneId, setActiveZoneId] = useState<number>(0)
   const [user, setUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
   
   useEffect(() => {
     if (user === null) {
@@ -93,8 +94,8 @@ function Home() {
           <p className="flex items-center justify-center h-full">Loading...</p>
         ) : (
           <>
-            <div className="mb-4">
-              <h2 className="text-2xl font-bold text-gray-800">
+            <div className="mb-6">
+              <h2 className="text-2xl font-bold text-gray-800 pb-3 border-b border-gray-200/60 rounded-sm">
                 {activeZoneId === 0 ? 'All Cameras' : zones.find(z => z.id === activeZoneId)?.name || activeZoneId}
               </h2>
             </div>
