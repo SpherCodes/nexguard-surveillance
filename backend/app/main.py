@@ -10,7 +10,7 @@ from .core.database.connection import Base, engine, SessionLocal, create_tables
 from .core.models import Camera
 from .services.camera_service import camera_service
 from .Settings import settings
-from .data.seed import seed_default_settings, seed_default_zones
+from .data.seed import seed_default_settings, seed_default_zones, seed_default_user
 from .dependencies import get_video_capture , get_inference_engine
 from .services.video_capture import CameraConfig, VideoCapture
 from .api.router import api_router
@@ -53,6 +53,8 @@ async def lifespan(app: FastAPI):
     try:
         seed_default_settings(db)
         seed_default_zones(db)
+        # Seed default admin user
+        seed_default_user(db)
         print("✅ Database tables created successfully")
 
         # Get cameras using the service layer
@@ -110,7 +112,7 @@ app = FastAPI(
 # CORS setup
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

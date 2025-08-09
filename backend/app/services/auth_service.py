@@ -1,7 +1,8 @@
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Dict, Any
+from typing import List, Optional, Dict, Any
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 from dotenv import load_dotenv
 import os
 from passlib.context import CryptContext
@@ -9,10 +10,11 @@ from passlib.context import CryptContext
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError
 
+
 from ..dependencies import DatabaseDep
 from ..core.models import User
 from ..utils.database_crud import CRUDBase
-from ..schema.user import UserCreate, UserUpdate
+from ..schema.user import UserCreate, UserRole, UserStatus, UserUpdate
 
 load_dotenv()
 
@@ -54,6 +56,16 @@ class AuthService(CRUDBase[User, UserCreate, UserUpdate]):
         
         user = self.create(db=db, obj_in=user_data)
         return user
+    
+    def delete_user(self, db: Session, user_id: int) -> bool:
+        """Delete a user"""
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise ValueError("User not found")
+        
+        db.delete(user)
+        db.commit()
+        return True
 
     def get_user_by_username(self, db: Session, username: str) -> Optional[User]:
         """Get a user by username"""
@@ -70,12 +82,92 @@ class AuthService(CRUDBase[User, UserCreate, UserUpdate]):
     def authenticate_user(self, db: Session, username: str, password: str) -> Optional[User]:
         """Authenticate a user with username and password"""
         user = self.get_user_by_username(db, username)
+        print(f"Authenticating user: {username}")
         if not user:
             return None
         if not self.verify_password(password, user.password):
             return None
         return user
+    
+    def get_all_users(
+        self,
+        db: Session,
+        status_filter: Optional[UserStatus] = None,
+        role_filter: Optional[UserRole] = None,
+        search: Optional[str] = None,
+        limit: int = 100,
+        offset: int = 0
+    ) -> List[User]:
+        """Get all users with optional filtering and search"""
+        query = db.query(User)
+        
+        if status_filter:
+            query = query.filter(User.status == status_filter)
+        
+        if role_filter:
+            query = query.filter(User.role == role_filter)
+        
+        if search:
+            search_pattern = f"%{search}%"
+            query = query.filter(
+                or_(
+                    User.username.ilike(search_pattern),
+                    User.email.ilike(search_pattern),
+                    User.full_name.ilike(search_pattern)
+                )
+            )
+        
+        return query.order_by(User.created_at.desc()).offset(offset).limit(limit).all()
+    
+    def update_last_login(self, db: Session, user_id: int) -> None:
+        """Update user's last login timestamp"""
+        user = db.query(User).filter(User.id == user_id).first()
+        if user:
+            user.last_login = datetime.now()
+            db.commit()
+            
+    def get_users_by_status(
+        self,
+        db: Session,
+        status: UserStatus,
+        limit: int = 50,
+        offset: int = 0
+    ) -> List[User]:
+        """Get users by specific status"""
+        return db.query(User).filter(
+            User.status == status
+        ).order_by(User.created_at.desc()).offset(offset).limit(limit).all()
+    
+    def update_user_status(self, db: Session, user_id: int, new_status: UserStatus) -> User:
+        """Update user status"""
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise ValueError("User not found")
+        
+        old_status = user.status
+        user.status = new_status
+        user.updated_at = datetime.utcnow()
+        
+        if new_status == UserStatus.APPROVED and old_status == UserStatus.PENDING:
+            user.last_login = None
+        
+        db.commit()
+        db.refresh(user)
+        return user
 
+    def update_user_role(self, db: Session, user_id: int, new_role: UserRole) -> User:
+        """Update user role"""
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise ValueError("User not found")
+        
+        user.role = new_role
+        user.updated_at = datetime.utcnow()
+        
+        db.commit()
+        db.refresh(user)
+        return user
+    
     def create_access_token(self, username: str, expires_delta: Optional[timedelta] = None) -> str:
         """Create access token for authenticated user"""
         if expires_delta:

@@ -57,10 +57,10 @@ const AuthForm = ({type}: {type: 'Sign-in' | 'Sign-up'}) => {
                 const newUser = await signUp(userData);
                 console.log('User registered successfully:', newUser);
                 
-                setSuccess('Account created successfully! Redirecting to dashboard...');
+                setSuccess('Account created successfully! Please sign in.');
                 setTimeout(() => {
-                    router.push('/');
-                }, 1500);
+                    router.push('/sign-in');
+                }, 1200);
             }
             else {
                 console.log('Submitting sign-in form with data:', data);
@@ -74,9 +74,7 @@ const AuthForm = ({type}: {type: 'Sign-in' | 'Sign-up'}) => {
 
                 if(loggedInUser) {
                     setSuccess('Login successful! Redirecting...');
-                    setTimeout(() => {
-                        router.push('/');
-                    }, 1000);
+                    router.push('/');
                 } else {
                     setError('Login failed. Please check your credentials.');
                 }

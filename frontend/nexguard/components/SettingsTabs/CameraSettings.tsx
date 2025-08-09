@@ -75,8 +75,8 @@ function CameraSettings() {
     return { total, online, offline };
   }, [cameras]);
   const { mutate: saveCameraMutate, isPending: isSaving } = useMutation({
-    mutationFn: ({ data, id }: { data: Camera, id?: number }) => {
-      return id ? updateCamera(id, data) : createCamera(data);
+    mutationFn: ({ data, id }: { data: Partial<Camera>; id?: number }) => {
+      return id ? updateCamera(id, data as Camera) : createCamera(data as Camera);
     },
     onSuccess: (savedCamera) => {
       queryClient.invalidateQueries({ queryKey: ['cameras'] });
@@ -88,7 +88,7 @@ function CameraSettings() {
   });
 
   const { mutateAsync: createZoneMutate } = useMutation({
-    mutationFn: (zoneName: string) => createZone(zoneName),
+    mutationFn: (zoneName: string) => createZone(zoneName, ''),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['zones'] }),
   });
 

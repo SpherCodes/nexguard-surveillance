@@ -12,32 +12,14 @@ import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
-import { Input } from '@/components/ui/input';
-import { Switch } from '@/components/ui/switch';
 
 import { useState } from 'react';
 import { systemSettingsNav } from '@/constants';
-import { Loader2, Save, Plus, Trash2, Users } from 'lucide-react';
+import { Loader2, Save, Users, Trash2 } from 'lucide-react';
 import { InfrenceFormProps, StorageFormProps} from '@/Types';
 import { getInferenceSettings, getSystemStorageSettings, updateInferenceSettings, updateStorageSettings} from '@/lib/actions/api.actions';
-
-// Access Control Schema
-const accessControlSchema = z.object({
-  sessionTimeout: z.number().min(5).max(1440),
-  maxLoginAttempts: z.number().min(1).max(10),
-  requireTwoFactor: z.boolean(),
-  allowPasswordReset: z.boolean(),
-  passwordMinLength: z.number().min(6).max(50),
-  users: z.array(z.object({
-    id: z.string(),
-    username: z.string().min(1),
-    role: z.enum(['admin', 'moderator', 'viewer']),
-    email: z.string().email(),
-    isActive: z.boolean(),
-  }))
-});
-
-type AccessControlFormData = z.infer<typeof accessControlSchema>;
+import { getUsers, getCurrentUser, updateUserStatus, deleteUser } from '@/lib/actions/user.actions';
+import type { User } from '@/Types';
 
 const SystemSettings = () => {
   const [activeSection, setActiveSection] = useState('inference');
@@ -54,23 +36,17 @@ const SystemSettings = () => {
     queryFn: getSystemStorageSettings,
   });
 
-  // Mock access control data - replace with actual API call
-  const { data: accessControlSettings } = useQuery({
-    queryKey: ['accessControlSettings'],
-    queryFn: () => Promise.resolve({
-      sessionTimeout: 60,
-      maxLoginAttempts: 5,
-      requireTwoFactor: false,
-      allowPasswordReset: true,
-      passwordMinLength: 8,
-      users: [
-        { id: '1', username: 'admin', role: 'admin' as const, email: 'admin@nexguard.com', isActive: true },
-        { id: '2', username: 'security', role: 'moderator' as const, email: 'security@nexguard.com', isActive: true },
-        { id: '3', username: 'viewer', role: 'viewer' as const, email: 'viewer@nexguard.com', isActive: false },
-      ]
-    }),
+  // Fetch real users for Access Control (admin endpoint)
+  const { data: users = [], isLoading: usersLoading, isError: usersError } = useQuery<User[]>({
+    queryKey: ['adminUsers'],
+    queryFn: getUsers,
   });
-
+  
+  // Current user (to determine admin/super-admin privileges)
+  const { data: currentUser } = useQuery<User | null>({
+    queryKey: ['currentUser'],
+    queryFn: getCurrentUser,
+  });
 
 
   const { mutate: saveInferenceConfig } = useMutation({
@@ -91,20 +67,8 @@ const SystemSettings = () => {
     onError: () => toast.error('Failed to update storage settings'),
   });
 
-  const { mutate: saveAccessControlConfig } = useMutation({
-    mutationFn: (data: AccessControlFormData) => {
-      // Mock API call - replace with actual implementation
-      return new Promise(resolve => setTimeout(resolve, 1000));
-    },
-    onSuccess: () => {
-      toast.success('Access control settings updated');
-      queryClient.invalidateQueries({ queryKey: ['accessControlSettings'] });
-    },
-    onError: () => toast.error('Failed to update access control settings'),
-  });
-
   const renderActivePanel = () => {
-    if (isLoading || !inferenceSettings || !storageSettings || !accessControlSettings) {
+    if (isLoading || !inferenceSettings || !storageSettings || usersLoading || usersError) {
       return (
         <div className="space-y-4">
           <div className="space-y-2">
@@ -148,11 +112,7 @@ const SystemSettings = () => {
           isLoading={isLoading}
         />;
       case 'access':
-        return <AccessControlForm
-          initialData={accessControlSettings}
-          onSave={(data: AccessControlFormData) => saveAccessControlConfig(data)}
-          isLoading={isLoading}
-        />;
+        return <AccessControlForm users={users} currentUser={currentUser || undefined} />;
       default:
         return null;
     }
@@ -212,6 +172,7 @@ const SystemSettings = () => {
 };
 
 export default SystemSettings;
+
 // --- Inference Form ---
   type InferenceFormData = z.infer<typeof inferenceSchema>;
   const InferenceForm = ({ initialData, onSave, isLoading }: InfrenceFormProps) => {
@@ -373,42 +334,75 @@ const StorageForm = ({
 
 // --- Access Control Form ---
 interface AccessControlFormProps {
-  initialData: AccessControlFormData;
-  onSave: (data: AccessControlFormData) => void;
-  isLoading: boolean;
+  users: User[];
+  currentUser?: User;
 }
 
-const AccessControlForm = ({ initialData, onSave, isLoading }: AccessControlFormProps) => {
-  const handleRemoveUser = (userId: string) => {
-    const updatedUsers = initialData.users.filter(user => user.id !== userId);
-    onSave({ ...initialData, users: updatedUsers });
+const AccessControlForm = ({ users, currentUser }: AccessControlFormProps) => {
+  const queryClient = useQueryClient();
+
+  const { mutate: mutateStatus } = useMutation({
+     mutationFn: ({ userId, status }: { userId: number; status: NonNullable<User['status']> }) =>
+       updateUserStatus(userId, status),
+    onSuccess: () => {
+      toast.success('User status updated');
+      queryClient.invalidateQueries({ queryKey: ['adminUsers'] });
+    },
+    onError: (e: Error) => toast.error(e.message || 'Failed to update status'),
+  });
+
+  const { mutate: mutateDelete, isPending: isDeletingUser } = useMutation({
+    mutationFn: (userId: number) => deleteUser(userId),
+    onSuccess: () => {
+      toast.success('User deleted');
+      queryClient.invalidateQueries({ queryKey: ['adminUsers'] });
+    },
+    onError: (e: Error) => toast.error(e.message || 'Failed to delete user'),
+  });
+
+  const formatRole = (role?: User['role']) => {
+    switch (role) {
+      case 'super_admin':
+        return 'Super Admin';
+      case 'admin':
+        return 'Admin';
+      case 'operator':
+        return 'Operator';
+      default:
+        return 'Unknown';
+    }
   };
 
-  const handleToggleUser = (userId: string) => {
-    const updatedUsers = initialData.users.map(user => 
-      user.id === userId ? { ...user, isActive: !user.isActive } : user
-    );
-    onSave({ ...initialData, users: updatedUsers });
+  const formatStatus = (status?: User['status']) => {
+    switch (status) {
+      case 'approved':
+        return 'Approved';
+      case 'pending':
+        return 'Pending';
+      case 'suspended':
+        return 'Suspended';
+      case 'rejected':
+        return 'Rejected';
+      default:
+        return 'Unknown';
+    }
   };
 
-  const handleRoleChange = (userId: string, newRole: string) => {
-    const updatedUsers = initialData.users.map(user => 
-      user.id === userId ? { ...user, role: newRole as 'admin' | 'moderator' | 'viewer' } : user
-    );
-    onSave({ ...initialData, users: updatedUsers });
-  };
+  const isActive = (status?: User['status']) => status === 'approved';
+  const canManageAdminUsers = currentUser?.role === 'super_admin';
+  const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'super_admin';
 
   return (
     <div className="space-y-4 h-full">
       <div className="space-y-1">
         <h3 className="text-lg font-semibold text-gray-900">User Access Control</h3>
-        <p className="text-gray-600 text-sm">Manage user accounts and their access permissions</p>
+        <p className="text-gray-600 text-sm">View user accounts and access roles</p>
       </div>
 
       <Card className="border-gray-200 shadow-sm">
         <CardHeader className="p-4 border-b border-gray-100">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-base font-medium text-gray-900">Active Users ({initialData.users.length})</CardTitle>
+            <CardTitle className="text-base font-medium text-gray-900">Users ({users.length})</CardTitle>
             <div className="flex items-center space-x-3 text-xs text-gray-500">
               <span className="flex items-center">
                 <div className="w-2 h-2 bg-green-500 rounded-full mr-1.5"></div>
@@ -423,56 +417,89 @@ const AccessControlForm = ({ initialData, onSave, isLoading }: AccessControlForm
         </CardHeader>
         <CardContent className="p-0">
           <div className="divide-y divide-gray-100">
-            {initialData.users.length === 0 ? (
+            {users.length === 0 ? (
               <div className="p-8 text-center text-gray-500">
                 <Users className="h-8 w-8 mx-auto mb-2 text-gray-300" />
                 <p className="text-sm">No users found.</p>
               </div>
             ) : (
-              initialData.users.map((user, index) => (
-                <div key={user.id} className="p-3 hover:bg-gray-50 transition-colors">
+              users.map((user) => (
+                <div key={user.id ?? user.username} className="p-3 hover:bg-gray-50 transition-colors">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
                       <div className={cn(
-                        "w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium",
-                        user.isActive ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-600"
+                        'w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium',
+                        isActive(user.status) ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-600'
                       )}>
-                        {user.username[0].toUpperCase()}
+                        {(user.username?.[0] || '?').toUpperCase()
+                        }
                       </div>
                       <div className="min-w-0">
                         <p className="font-medium text-gray-900 text-sm truncate">{user.username}</p>
                         <p className="text-xs text-gray-500 truncate">{user.email}</p>
                       </div>
                     </div>
-                    
-                    <div className="flex items-center space-x-2">
-                      <Select 
-                        value={user.role} 
-                        onValueChange={(value) => handleRoleChange(user.id, value)}
-                      >
-                        <SelectTrigger className="h-7 w-20 text-xs border-gray-300">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="viewer">Viewer</SelectItem>
-                          <SelectItem value="moderator">Moderator</SelectItem>
-                          <SelectItem value="admin">Admin</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      
-                      <Switch 
-                        checked={user.isActive} 
-                        onCheckedChange={() => handleToggleUser(user.id)}
-                      />
-                      
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        onClick={() => handleRemoveUser(user.id)}
-                        className="h-6 w-6 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs px-2 py-1 rounded border border-gray-200 bg-white text-gray-700">
+                        {formatRole(user.role)}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        {isAdmin ? (
+                          <Select
+                            defaultValue={user.status || 'pending'}
+                            onValueChange={(v) => {
+                              if (!user.id) return;
+                              const isAdminTarget = user.role === 'admin' || user.role === 'super_admin';
+                              const allowed = canManageAdminUsers || !isAdminTarget;
+                              if (!allowed) {
+                                toast.error('Insufficient privileges to modify admin users');
+                                return;
+                              }
+                              if (user.id === currentUser?.id) {
+                                toast.error('You cannot change your own status');
+                                return;
+                              }
+                              mutateStatus({ userId: user.id, status: v as NonNullable<User['status']> });
+                            }}
+                          >
+                            <SelectTrigger className="h-8 w-[140px] text-xs">
+                              <SelectValue placeholder="Status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="pending">Pending</SelectItem>
+                              <SelectItem value="approved">Approved</SelectItem>
+                              <SelectItem value="suspended">Suspended</SelectItem>
+                              <SelectItem value="rejected">Rejected</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <span className="text-xs px-2 py-1 rounded border border-gray-200 bg-gray-50 text-gray-600 cursor-not-allowed">
+                            {formatStatus(user.status)}
+                          </span>
+                        )}
+                        {(isAdmin && user.id !== currentUser?.id && (
+                          currentUser?.role === 'super_admin'
+                            ? user.role !== 'super_admin'
+                            : user.role !== 'admin' && user.role !== 'super_admin'
+                        )) && (
+                           <Button
+                             variant="outline"
+                             size="icon"
+                             className="h-8 w-8 text-red-600"
+                             title="Delete user"
+                             onClick={() => {
+                               if (!user.id) return;
+                               if (window.confirm(`Delete user ${user.username}? This cannot be undone.`)) {
+                                 mutateDelete(user.id);
+                               }
+                             }}
+                             disabled={isDeletingUser}
+                           >
+                             <Trash2 className="h-4 w-4" />
+                           </Button>
+                         )}
+                       </div>
                     </div>
                   </div>
                 </div>
@@ -481,17 +508,6 @@ const AccessControlForm = ({ initialData, onSave, isLoading }: AccessControlForm
           </div>
         </CardContent>
       </Card>
-      
-      <div className="flex justify-end pt-3 border-t border-gray-200">
-        <Button 
-          type="button"
-          disabled={isLoading}
-          className="bg-gray-900 hover:bg-gray-800 text-white px-5 h-8 font-medium text-sm"
-        >
-          {isLoading ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : <Save className="mr-2 h-3 w-3" />} 
-          Save Changes
-        </Button>
-      </div>
     </div>
   );
-};
+ };
