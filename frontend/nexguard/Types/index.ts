@@ -1,8 +1,5 @@
-import { signIn } from './../lib/actions/user.actions';
 import { cameraFormSchema } from '@/lib/utils';
 import z from 'zod';
-
-/* eslint-disable @typescript-eslint/no-unused-vars */
 
 interface WebRTCConnection {
   peerConnection: RTCPeerConnection | null;
@@ -60,7 +57,7 @@ type DetectionImageMedia = {
   detectionId: number;
   imageData: string;
   createdAt: Date;
-}
+};
 
 declare interface Zone {
   id: number;
@@ -106,7 +103,7 @@ interface signInProps {
   password: string;
 }
 
-interface SignUpProps{
+interface SignUpProps {
   userName: string;
   firstName: string;
   middleName?: string;
@@ -118,11 +115,14 @@ interface SignUpProps{
 }
 
 export interface User {
+  id?: number;
   username: string;
   firstname: string;
   lastname: string;
   email: string;
   phone: string;
+  role?: 'operator' | 'admin' | 'super_admin';
+  status?: 'pending' | 'approved' | 'suspended' | 'rejected';
 }
 export interface AuthError {
   detail: string;
@@ -145,5 +145,5 @@ export type {
   WebRTCConnection,
   signInProps,
   SignUpProps,
-  UserFormProps,
+  UserFormProps
 };

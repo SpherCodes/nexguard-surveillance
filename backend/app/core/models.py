@@ -101,3 +101,7 @@ class User(Base):
     password = Column(String, nullable=False)
     phone = Column(String(20), nullable=True)
     is_active = Column(Boolean, default=True)
+    last_login = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.now)
+    role = Column(String(20), default="operator")
+    status = Column(String(20), default="pending")

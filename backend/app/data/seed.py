@@ -1,8 +1,11 @@
 from pylibsrtp import Session
 
-from ..core.models import Zone
+from ..schema.user import UserStatus
 
+from ..core.models import Zone
 from ..core.models import InferenceSettings, StorageSettings
+from ..core.models import User
+from ..services.auth_service import auth_service
 
 
 def seed_default_settings(session:Session):
@@ -50,3 +53,28 @@ def seed_detection_models(db):
     
     db.commit()
     print("Default detection models seeded successfully.")
+
+def seed_default_user(db):
+    """Seed a default admin user if none exists."""
+    existing = db.query(User).filter_by(username="admin").first()
+    if existing:
+        print("Default admin user already exists.")
+        return existing
+
+    user = User(
+        firstname="Admin",
+        lastname="User",
+        middlename=None,
+        username="admin",
+        email="admin@nexguard.local",
+        password=auth_service.hash_password("Admin@12345"),
+        phone=None,
+        is_active=True,
+        status= UserStatus.APPROVED,
+        role="admin",
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    print("Default admin user seeded successfully.")
+    return user
