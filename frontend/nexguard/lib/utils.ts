@@ -108,3 +108,4 @@ export const authFormSchema = (type: 'Sign-up' | 'Sign-in') => {
       message: "Passwords don't match"
     });
 };
+

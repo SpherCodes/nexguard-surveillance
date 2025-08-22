@@ -27,6 +27,11 @@ pydantic-settings>=2.0.0
 # Logging and monitoring
 loguru>=0.7.0
 
+# Authentication and notifications
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+firebase-admin>=6.2.0
+
 # HTTP client
 httpx>=0.25.0
 aiofiles>=23.2.0

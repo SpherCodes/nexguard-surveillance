@@ -315,3 +315,7 @@ logs/
 
 # WebRTC test files
 test-webrtc.html
+
+#FCM
+fcm_tokens.json
+service_key.json

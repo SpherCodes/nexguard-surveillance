@@ -2,6 +2,7 @@ import { SignUpProps, User } from '@/Types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
+// TODO:Move the fetch function to a separate file for easy reuse
 const authFetch = async (url: string, options: RequestInit = {}) => {
   const defaultOptions: RequestInit = {
     credentials: 'include',

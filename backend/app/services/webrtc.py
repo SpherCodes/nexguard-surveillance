@@ -251,7 +251,6 @@ class RTCSessionManager:
                 if camera_id in self.tracks and not self.tracks[camera_id]:
                     del self.tracks[camera_id]
                     
-                print(f"Closed peer connection for {camera_id}/{peer_id}")
         except Exception as e:
             print(f"Error closing peer connection: {e}")
     

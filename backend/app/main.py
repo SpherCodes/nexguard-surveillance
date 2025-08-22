@@ -19,6 +19,7 @@ video_capture = get_video_capture()
 inference_engine = get_inference_engine()
 
 
+
 def setup_database():
     """Initialize and migrate database if missing"""
     try:
