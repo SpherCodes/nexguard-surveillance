@@ -23,7 +23,6 @@ async def get_recent_detections(
     db: DatabaseDep
 ):
     """Get recent detections with images by date"""
-    print(f"Fetching detections for date: {date}")
     try:
         detections = detection_service.get_by_date(
         db=db,
@@ -56,3 +55,39 @@ async def get_detection_stats(db: Session = Depends(get_db)):
         "total_detections": db.query(Detection).count(),
         "total_media_files": db.query(Media).count()
     }
+
+@router.post("/test-detection")
+async def trigger_test_detection(
+    db: DatabaseDep
+):
+    """Trigger a test detection for debugging notifications"""
+    try:
+        # Create a test detection record
+        detection_data = {
+            "camera_id": 1,
+            "detection_type": "person",
+            "confidence": 0.95,
+            "bbox_x1": 100,
+            "bbox_y1": 100,
+            "bbox_x2": 200,
+            "bbox_y2": 200,
+            "timestamp": datetime.now().timestamp()
+        }
+        
+        detection = detection_service.create(db=db, detection_data=detection_data)
+        
+        # Trigger the detection event manager to send alerts
+        detection_manager = DetectionEventManager()
+        await detection_manager.send_detection_alert(detection)
+        
+        return {
+            "success": True,
+            "message": "Test detection created and alert sent",
+            "detection_id": detection.id
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to create test detection: {str(e)}"
+        )

@@ -146,7 +146,7 @@ class AuthService(CRUDBase[User, UserCreate, UserUpdate]):
         
         old_status = user.status
         user.status = new_status
-        user.updated_at = datetime.utcnow()
+        user.updated_at = datetime.now(timezone.utc)
         
         if new_status == UserStatus.APPROVED and old_status == UserStatus.PENDING:
             user.last_login = None
@@ -162,7 +162,7 @@ class AuthService(CRUDBase[User, UserCreate, UserUpdate]):
             raise ValueError("User not found")
         
         user.role = new_role
-        user.updated_at = datetime.utcnow()
+        user.updated_at = datetime.now(timezone.utc)
         
         db.commit()
         db.refresh(user)

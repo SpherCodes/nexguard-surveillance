@@ -1,4 +1,5 @@
 from ast import List
+import asyncio
 from datetime import datetime
 import json
 import os
@@ -10,6 +11,10 @@ from typing import Any, Dict, List, Optional, Tuple
 import cv2
 import numpy as np
 from sqlalchemy.orm import Session
+
+
+from ..core.models import User
+
 
 
 #Temporary fix for circular dependency injection
@@ -27,22 +32,24 @@ from ..Settings import settings
 
 class DetectionEventManager:
     """Manages detection events"""
-    def __init__(self):
+    def __init__(self, alert_service):
         self.db = next(get_db())  # Get actual session, not generator
         self.storage_path = Path(settings.STORAGE_DIR)
         self.events = []
+        self.alert_service = alert_service
         self.active_recordings: Dict[str, Dict] = {}
         self.recording_lock = threading.Lock()
         self.video_duration = 30
         self.min_confidence = settings.MIN_CONFIDENCE if hasattr(settings, 'MIN_CONFIDENCE') else 0.5
         
-        self.detection_cooldown = 30
+        self.detection_cooldown = settings.DETECTION_COOLDOWN if hasattr(settings, 'DETECTION_COOLDOWN') else 30
+        self.enable_alerts = settings.ENABLE_ALERT_NOTIFICATIONS if hasattr(settings, 'ENABLE_ALERT_NOTIFICATIONS') else True
         self.last_detection_time: Dict[str, float] = {}
         self.detection_cache_lock = threading.Lock()
         
         self.video_capture = None
         self.inference_engine = None
-    
+
     def should_record_detection(self, detection: Dict[str, Any]) -> bool:
         """Check if detection meets criteria for recording"""
         detection_type = detection.get('name', '').lower()
@@ -72,7 +79,7 @@ class DetectionEventManager:
             return False
 
     #TODO: Find a type safe way to handle inject InferenceEngine into this class that avoid circular dependency
-    def record_detection(self, camera_id: str, frame_data: FrameData, detection: Dict[str, Any], inference_service: Any ) -> Optional[Detection]:
+    def  record_detection(self, camera_id: str, frame_data: FrameData, detection: Dict[str, Any], inference_service: Any ) -> Optional[Detection]:
         """Record a detection event"""
         if inference_service:
             self.inference_engine = inference_service
@@ -91,12 +98,29 @@ class DetectionEventManager:
                 confidence=detection.get('conf', 0.0)
             )
             
-            date_parts = datetime.fromtimestamp(detection_event.timestamp).strftime("%Y/%m/%d").split('/')
-            print(f"Camera Service: {camera_service}")
-            camera = camera_service.get_by_camera_id(self.db, camera_id)
-            try:
-                db_detection =  detection_service.create_detection(self.db, detection_event)
+            # Create detection record first
+            db_detection = detection_service.create_detection(self.db, detection_event)
+            
+            # Send Firebase FCM alert notification
+            if self.alert_service and db_detection and self.enable_alerts:
+                try:
+                    camera = camera_service.get_by_camera_id(self.db, camera_id)
+                    camera_name = camera.name if camera else f"Camera {camera_id}"
+                    
+                    # Send alert using the synchronous wrapper (schedules async task)
+                    self.send_detection_alert_sync(db_detection, camera_name)
+                    
+                except Exception as e:
+                    print(f"Error sending alert notifications: {e}")
+            else:
+                print("Alert service is not available or detection creation failed - notifications not sent")
 
+            # Continue with media processing
+            date_parts = datetime.fromtimestamp(detection_event.timestamp).strftime("%Y/%m/%d").split('/')
+            camera = camera_service.get_by_camera_id(self.db, camera_id)
+            
+            try:
+                # Media processing for the already created detection
                 img_dir = settings.STORAGE_IMG_DIR / camera.name / date_parts[0] / date_parts[1] / date_parts[2]
                 img_dir.mkdir(parents=True, exist_ok=True)
                 
@@ -113,8 +137,6 @@ class DetectionEventManager:
                 # self._create_thumbnail(annotated_frame, thumbnail_path)
                 # thumbnail_rel_path = str(thumbnail_path.relative_to(self.storage_path))
                 
-                print(f"Saving detection: {db_detection.id}")
-                
                 image_media = MediaCreate(
                     camera_id=int(camera_id),
                     detection_id=db_detection.id,
@@ -127,17 +149,6 @@ class DetectionEventManager:
                 print(f"Saving image media: {image_media}")
                 
                 media_service.create_media(self.db, image_media)
-                
-                # thumbnail_media = MediaCreate(
-                #     camera_id=int(camera_id),
-                #     detection_id=db_detection.id,
-                #     media_type="thumbnail",
-                #     path=thumbnail_rel_path,
-                #     timestamp=detection_event.timestamp,
-                #     size_bytes=os.path.getsize(thumbnail_path)
-                # )
-                
-                # media_service.create_media(self.db, thumbnail_media)
                 
                 self._start_video_recording(camera_id, detection_event.timestamp, db_detection.id if db_detection else 1)
                 
@@ -154,6 +165,66 @@ class DetectionEventManager:
             import traceback
             traceback.print_exc()
             return None
+            
+    async def send_detection_alert(self, detection: Detection, camera_name: str = None) -> bool:
+        """Send Firebase FCM alert for a detection to all active users"""
+        if not self.alert_service:
+            print("Alert service not available")
+            return False
+            
+        try:
+            # Determine zone name
+            zone_name = camera_name or f"Camera {detection.camera_id}"
+            
+            # Get all active users
+            users = self.db.query(User).filter(User.is_active == True).all()
+            
+            notification_sent = False
+            # Prepare notification content
+            notif_title = "🚨 Security Alert"
+            notif_body = f"{detection.detection_type.title()} detected in {zone_name} (Confidence: {detection.confidence:.1%})"
+            notif_data = {
+                "detection_id": str(detection.id),
+                "camera_id": str(detection.camera_id),
+                "detection_type": detection.detection_type,
+                "confidence": str(detection.confidence),
+                "timestamp": str(detection.timestamp),
+                "zone_name": zone_name,
+                "alert_type": "detection"
+            }
+            
+            # Also send to alerts topic for subscribed users
+            try:
+                await asyncio.to_thread(self.alert_service.send_alert, self.db, detection)
+            except Exception as topic_error:
+                print(f"Error sending topic alert: {topic_error}")
+            
+            return notification_sent
+        except Exception as e:
+            print(f"Error in send_detection_alert: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+
+    def send_detection_alert_sync(self, detection: Detection, camera_name: str = None) -> None:
+        """Synchronous wrapper for sending detection alerts"""
+        try:
+            
+            # Try to get current event loop, create new one if none exists
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    # If loop is running, create a task
+                    asyncio.create_task(self.send_detection_alert(detection, camera_name))
+                else:
+                    # If loop exists but not running, run the coroutine
+                    loop.run_until_complete(self.send_detection_alert(detection, camera_name))
+            except RuntimeError:
+                # No event loop exists, create a new one
+                asyncio.run(self.send_detection_alert(detection, camera_name))
+                
+        except Exception as e:
+            print(f"Error in send_detection_alert_sync: {e}")
             
     def _annotate_frame(self, frame: np.ndarray, detection: Dict, timestamp: float) -> np.ndarray:
         """Create annotated frame with detection overlay"""
@@ -223,13 +294,10 @@ class DetectionEventManager:
             start_time = recording_info['start_time']
             end_time = recording_info['end_time']
             detection_id = recording_info['detection_id']
-            print(f"Recording video for camera {camera_id} from {start_time} to {end_time}, detection ID: {detection_id}")
             while time.time() < end_time:
                 frame_data = None
-                print(f"Inference_instance: {self.inference_engine}")
                 if self.inference_engine:
                     frame_data = self.inference_engine.get_latest_results(camera_id)
-                    print(f"Frame data for camera {camera_id}: {frame_data}")
                 if frame_data and getattr(frame_data, 'timestamp', 0) >= start_time:
                     frames_collected.append((frame_data.frame.copy(), frame_data.timestamp))
                 
@@ -284,11 +352,100 @@ class DetectionEventManager:
             )
             media_service.create_media(self.db, video_media)
             
-            print(f"Video saved: {output_path}")
-            
         except Exception as e:
             print(f"Error saving video clip: {e}")
             import traceback
             traceback.print_exc()
 
-detection_manager = DetectionEventManager()
+    async def send_test_alert(self, user_id: int = None, message: str = "Test Alert") -> bool:
+        """Send a test alert to verify the notification system"""
+        if not self.alert_service:
+            print("Alert service not available for test")
+            return False
+            
+        try:
+            # Determine recipients
+            if user_id:
+                user_obj = self.db.query(User).filter(User.id == user_id).first()
+                users = [user_obj] if user_obj else []
+            else:
+                users = self.db.query(User).filter(User.is_active == True).all()
+
+            success = False
+            # Send a test notification to each user
+            for user in users:
+                try:
+                    # Use to_thread to run blocking DB + network call
+                    message_ids = await asyncio.to_thread(
+                        self.alert_service.send_notification_to_user,
+                        self.db,
+                        user.id,
+                        title="🧪 Test Alert",
+                        body=message,
+                        data={
+                            "alert_type": "test",
+                            "timestamp": str(time.time()),
+                            "message": message
+                        }
+                    )
+                    if message_ids:
+                        print(f"Test alert sent to user {user.id}")
+                        success = True
+                except Exception as user_error:
+                    print(f"Error sending test alert to user {user.id}: {user_error}")
+            return success
+        except Exception as e:
+            print(f"Error in send_test_alert: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+
+    def send_test_alert_sync(self, user_id: int = None, message: str = "Test Alert") -> bool:
+        """Synchronous wrapper for sending test alerts"""
+        try:
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    asyncio.create_task(self.send_test_alert(user_id, message))
+                    return True
+                else:
+                    return loop.run_until_complete(self.send_test_alert(user_id, message))
+            except RuntimeError:
+                return asyncio.run(self.send_test_alert(user_id, message))
+                
+        except Exception as e:
+            print(f"Error in send_test_alert_sync: {e}")
+            return False
+
+    def get_alert_service_status(self) -> Dict[str, Any]:
+        """Get status information about the alert service"""
+        status = {
+            "alert_service_available": self.alert_service is not None,
+            "firebase_initialized": False,
+            "active_users_count": 0,
+            "users_with_tokens": 0
+        }
+        
+        try:
+            if self.alert_service:
+                # Check if Firebase is initialized
+                import firebase_admin
+                status["firebase_initialized"] = len(firebase_admin._apps) > 0
+                
+                # Count active users
+                from ..core.models import User, UserDeviceToken
+                active_users = self.db.query(User).filter(User.is_active == True).count()
+                status["active_users_count"] = active_users
+                
+                # Count users with device tokens
+                users_with_tokens = self.db.query(UserDeviceToken).distinct(UserDeviceToken.user_id).count()
+                status["users_with_tokens"] = users_with_tokens
+                
+        except Exception as e:
+            print(f"Error getting alert service status: {e}")
+            status["error"] = str(e)
+            
+        return status
+
+# Global instance will be created through dependency injection in dependencies.py
+# detection_manager = DetectionEventManager(alert_service)

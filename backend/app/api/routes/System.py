@@ -1,8 +1,9 @@
 from turtle import st
 from fastapi import APIRouter, Depends, HTTPException
 from datetime import datetime
+from typing import Dict, Any, Optional
 
-from ...dependencies import DatabaseDep
+from ...dependencies import DatabaseDep, get_detection_event_manager
 
 #TODO: Refactor the settings endpoint to use a settings service 
 # instead of direct database access

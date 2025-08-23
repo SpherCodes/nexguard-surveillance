@@ -4,6 +4,7 @@ import { SettingsTabList } from '@/constants';
 import SystemSettings from '@/components/SettingsTabs/SystemSettings';
 import CameraSettings from '@/components/SettingsTabs/CameraSettings';
 import { Settings } from 'lucide-react';
+import NotificationSettings from '@/components/SettingsTabs/NotificationSettings';
 
 function SettingsPage() {
 
@@ -23,7 +24,7 @@ function SettingsPage() {
         </div>
       </div>
 
-      {/* Main Content with optimized spacing */}
+      {/* Main Content */}
       <div className="flex-1 p-4">
         <Tabs defaultValue="Cameras" className="w-full h-full max-w-6xl mx-auto">
           <div className="mb-4">
@@ -48,9 +49,8 @@ function SettingsPage() {
               <SystemSettings />
             </TabsContent>
             <TabsContent value="General" className="flex-1 mt-0">
-              <div className="p-4 bg-white rounded-xl border border-gray-200 shadow-sm">
-                <h3 className="text-lg font-bold text-gray-900 mb-2">General Settings</h3>
-                <p className="text-gray-600 text-sm">General application preferences coming soon...</p>
+              <div className="space-y-6">
+                <NotificationSettings/>
               </div>
             </TabsContent>
           </div>

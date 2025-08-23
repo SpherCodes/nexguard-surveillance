@@ -7,9 +7,10 @@ from webbrowser import get
 from fastapi import Depends
 from sqlalchemy.orm import Session
 
-from .utils.detection_manager import DetectionEventManager
+from .services.alert_service import AlertService
 
-from .utils import detection_manager
+from .Settings import settings
+from .utils import firebase_fcm_service
 
 
 
@@ -19,10 +20,13 @@ from .services.zone_service import zone_service
 from .services.detection_service import detection_service
 from .services.video_capture import VideoCapture
 from .services.inference_engine import YOLOProcessor as InferenceEngine
+from .utils.detection_manager import DetectionEventManager
 
 _video_capture: Optional[VideoCapture] = None
 _inference_engine: Optional[InferenceEngine] = None
-_detection_manager: Optional[DetectionEventManager] = None
+_detection_manager: Optional["DetectionEventManager"] = None
+_firebase_fcm_service: Optional[firebase_fcm_service.Firebase_FCM_Service] = None
+_alert_service: Optional[AlertService] = None
 
 def get_video_capture() -> VideoCapture:
     """Get or create video capture singleton"""
@@ -59,10 +63,25 @@ def get_detection_event_manager():
     """Get detection event manager instance"""
     global _detection_manager
     if _detection_manager is None:
-        _detection_manager = DetectionEventManager()
+        alert_service = get_alert_service()
+        _detection_manager = DetectionEventManager(alert_service)
     return _detection_manager
 
-#TODO: fix the use of Session 
+def get_firebase_fcm_service():
+    """Get Firebase FCM service instance"""
+    global _firebase_fcm_service
+    if _firebase_fcm_service is None:
+        _firebase_fcm_service = firebase_fcm_service.Firebase_FCM_Service(settings.FIREBASE_SERVICE_ACCOUNT)
+    return _firebase_fcm_service
+
+def get_alert_service():
+    """Get Alert service instance"""
+    global _alert_service
+    if _alert_service is None:
+        _alert_service = AlertService(get_firebase_fcm_service())
+    return _alert_service
+
+#TODO: fix the use of Session
 """Manages persistence operations for ORM-mapped objects.
 
 The _orm.Session is not safe for use in concurrent threads.. See session_faq_threadsafe for background.

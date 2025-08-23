@@ -153,8 +153,8 @@ class YOLOProcessor:
                     }
                     frame_data.detections.append(detection)
                     # Record detection synchronously
-                    # if self.detection_manager:
-                    #     self.detection_manager.record_detection(camera_id, frame_data, detection , self)
+                    if self.detection_manager:
+                        self.detection_manager.record_detection(camera_id, frame_data, detection , self)
                     
                     # Track human detection for UI
                     # if detection['name'].lower() == 'person':
