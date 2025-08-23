@@ -20,7 +20,7 @@ export function Providers({ children }: { children: ReactNode }) {
     <QueryClientProvider client={queryClient}>
       <NotificationProvider>
         <ServiceWorkerRegistration />
-        {children}
+  <div className="min-h-screen">{children}</div>
         <Toaster 
           position="top-right"
           richColors

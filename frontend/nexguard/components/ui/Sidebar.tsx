@@ -45,7 +45,8 @@ const Sidebar = () => {
     <TooltipProvider delayDuration={0}>
       <aside 
         className={cn(
-          "h-screen flex flex-col bg-gradient-to-br from-slate-50 via-gray-50 to-white border-r border-gray-200/60 shadow-xl backdrop-blur-md relative overflow-hidden transition-all duration-300 ease-in-out",
+          // Hide the desktop sidebar on small screens (we use BottomNav there)
+          "hidden md:flex h-screen flex-col bg-gradient-to-br from-slate-50 via-gray-50 to-white border-r border-gray-200/60 shadow-xl backdrop-blur-md relative overflow-hidden transition-all duration-300 ease-in-out",
           isExpanded ? "w-64" : "w-[5rem]"
         )}
         onMouseEnter={() => setIsExpanded(true)}
