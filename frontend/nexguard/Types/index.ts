@@ -70,7 +70,7 @@ interface CameraFormProps {
   initialData?: Camera | null;
   zones: Zone[];
   onSubmit: (data: CameraFormData, id?: number) => void;
-  onDelete?: (id: string) => void;
+  onDelete?: () => void;
   onCreateZone: (zoneName: string) => Promise<Zone>;
 }
 

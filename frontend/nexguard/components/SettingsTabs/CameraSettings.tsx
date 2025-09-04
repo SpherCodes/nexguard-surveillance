@@ -119,97 +119,139 @@ function CameraSettings() {
   if (error) return <ErrorState message={error.message} onRetry={refetch} />;
   return (
     <>
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-3 h-full">
+      <div className="flex flex-col lg:grid lg:grid-cols-3 gap-4 lg:gap-8 h-full">
+        {/* Mobile Header - Only visible on small screens */}
+        <div className="lg:hidden space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+              <CameraIcon className="h-5 w-5 text-gray-900" />
+              Cameras ({cameraStats.total})
+            </h2>
+            <Button
+              onClick={handleAddClick}
+              disabled={isSaving && isAdding}
+              size="sm"
+              className="bg-gray-900 hover:bg-gray-800 text-white px-3 h-9 rounded-lg font-medium transition-all duration-200 shadow-sm hover:shadow-md"
+              title="Add Camera"
+            >
+              {isSaving && isAdding ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Plus className="h-4 w-4" />
+              )}
+              <span className="ml-2 hidden xs:inline">Add</span>
+            </Button>
+          </div>
+
+          {/* Mobile Status Cards */}
+          <div className="grid grid-cols-3 gap-2">
+            <div className="bg-white p-3 rounded-xl shadow-sm ring-1 ring-gray-100">
+              <div className="text-xs font-medium text-gray-600 mb-1">Total</div>
+              <div className="text-lg font-bold text-gray-900">{cameraStats.total}</div>
+            </div>
+            <div className="bg-white p-3 rounded-xl shadow-sm ring-1 ring-gray-100">
+              <div className="text-xs font-medium text-gray-600 mb-1">Online</div>
+              <div className="text-lg font-bold text-green-600">{cameraStats.online}</div>
+            </div>
+            <div className="bg-white p-3 rounded-xl shadow-sm ring-1 ring-gray-100">
+              <div className="text-xs font-medium text-gray-600 mb-1">Offline</div>
+              <div className="text-lg font-bold text-red-600">{cameraStats.offline}</div>
+            </div>
+          </div>
+        </div>
+
         {/* Camera List Section */}
-        <div className="flex flex-col gap-6 lg:col-span-1">
-          {/* Header Section */}
-          <div className="space-y-4">
+        <div className="flex flex-col gap-4 lg:gap-6 lg:col-span-1">
+          {/* Desktop Header Section */}
+          <div className="hidden lg:block space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-800">Cameras</h2>
+              <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                <CameraIcon className="h-5 w-5 text-gray-900" />
+                Cameras
+              </h2>
               <div className="flex items-center gap-2">
                 <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
                   {cameraStats.online}/{cameraStats.total} online
                 </span>
               </div>
             </div>
+          </div>
 
-            {/* Search and Filter */}
-            <div className="space-y-3">
-              <div className="relative">
+          {/* Search and Filter */}
+          <div className="space-y-3">
+            <div className="flex gap-2 items-center">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <Input
+                  placeholder="Search cameras..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 bg-gray-50 border-gray-200 focus:bg-white h-10"
+                />
               </div>
-              <div className="flex gap-2 items-center">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                  <Input
-                    placeholder="Search cameras..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10 bg-gray-50 border-gray-200 focus:bg-white"
-                  />
-                </div>
-                <Button
-                  onClick={handleAddClick}
-                  disabled={isSaving && isAdding}
-                  size="sm"
-                  className="bg-black hover:bg-gray-800 text-white px-3 h-8 rounded-lg font-medium transition-all duration-200 shadow-sm hover:shadow-md"
-                  title="Add Camera"
-                >
-                  {isSaving && isAdding ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Plus className="h-4 w-4" />
-                  )}
-                </Button>
-              </div>
-              <div className="flex gap-2 mt-3"></div>
-              <div className="flex gap-2">
-                <Button
-                  variant={statusFilter === 'all' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setStatusFilter('all')}
-                  className={cn(
-                    'flex-1 text-xs',
-                    statusFilter === 'all' 
-                      ? 'bg-black hover:bg-gray-800 text-white' 
-                      : 'bg-white hover:bg-gray-50'
-                  )}
-                >
-                  All ({cameraStats.total})
-                </Button>
-                <Button
-                  variant={statusFilter === 'online' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setStatusFilter('online')}
-                  className={cn(
-                    'flex-1 text-xs',
-                    statusFilter === 'online' 
-                      ? 'bg-green-600 hover:bg-green-700 text-white' 
-                      : 'bg-white hover:bg-gray-50'
-                  )}
-                >
-                  <Wifi className="mr-1 h-3 w-3" />
-                  Online ({cameraStats.online})
-                </Button>
-                <Button
-                  variant={statusFilter === 'offline' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setStatusFilter('offline')}
-                  className={cn(
-                    'flex-1 text-xs',
-                    statusFilter === 'offline' 
-                      ? 'bg-red-600 hover:bg-red-700 text-white' 
-                      : 'bg-white hover:bg-gray-50'
-                  )}
-                >
-                  <WifiOff className="mr-1 h-3 w-3" />
-                  Offline ({cameraStats.offline})
-                </Button>
-              </div>
+              <Button
+                onClick={handleAddClick}
+                disabled={isSaving && isAdding}
+                size="sm"
+                className="hidden lg:flex bg-gray-900 hover:bg-gray-800 text-white px-3 h-10 rounded-lg font-medium transition-all duration-200 shadow-sm hover:shadow-md"
+                title="Add Camera"
+              >
+                {isSaving && isAdding ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Plus className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
+            
+            {/* Filter Buttons - Horizontal scroll on mobile */}
+            <div className="flex gap-2 overflow-x-auto pb-2">
+              <Button
+                variant={statusFilter === 'all' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setStatusFilter('all')}
+                className={cn(
+                  'flex-shrink-0 text-xs min-w-fit px-3',
+                  statusFilter === 'all' 
+                    ? 'bg-gray-900 hover:bg-gray-800 text-white' 
+                    : 'bg-white hover:bg-gray-50'
+                )}
+              >
+                All ({cameraStats.total})
+              </Button>
+              <Button
+                variant={statusFilter === 'online' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setStatusFilter('online')}
+                className={cn(
+                  'flex-shrink-0 text-xs min-w-fit px-3',
+                  statusFilter === 'online' 
+                    ? 'bg-green-600 hover:bg-green-700 text-white' 
+                    : 'bg-white hover:bg-gray-50'
+                )}
+              >
+                <Wifi className="mr-1 h-3 w-3" />
+                Online ({cameraStats.online})
+              </Button>
+              <Button
+                variant={statusFilter === 'offline' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setStatusFilter('offline')}
+                className={cn(
+                  'flex-shrink-0 text-xs min-w-fit px-3',
+                  statusFilter === 'offline' 
+                    ? 'bg-red-600 hover:bg-red-700 text-white' 
+                    : 'bg-white hover:bg-gray-50'
+                )}
+              >
+                <WifiOff className="mr-1 h-3 w-3" />
+                Offline ({cameraStats.offline})
+              </Button>
             </div>
           </div>
 
           <div className="flex-1 min-h-0">
-            <div className="h-full overflow-y-auto space-y-3 pr-2">
+            <div className="h-full overflow-y-auto space-y-2 lg:space-y-3 pr-1 lg:pr-2">
               {isLoadingCameras ? (
                 Array.from({ length: 3 }).map((_, i) => <CameraItemSkeleton key={i} />)
               ) : filteredCameras.length > 0 ? (
@@ -239,14 +281,14 @@ function CameraSettings() {
                   </Button>
                 </div>
               ) : (
-                <div className="flex flex-col items-center justify-center h-64 text-center p-6 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200">
-                  <CameraIcon className="h-12 w-12 text-gray-300 mb-4" />
+                <div className="flex flex-col items-center justify-center h-48 lg:h-64 text-center p-4 lg:p-6 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200">
+                  <CameraIcon className="h-10 w-10 lg:h-12 lg:w-12 text-gray-300 mb-3 lg:mb-4" />
                   <h3 className="text-sm font-medium text-gray-600 mb-2">No cameras configured</h3>
                   <p className="text-xs text-gray-500 mb-4">Get started by adding your first camera</p>
                   <Button 
                     onClick={handleAddClick}
                     size="sm"
-                    className="bg-black hover:bg-gray-800 text-white"
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
                   >
                     <Plus className="mr-1 h-3 w-3" />
                     Add Camera
@@ -259,10 +301,10 @@ function CameraSettings() {
 
         {/* Configuration Panel */}
         <div className="lg:col-span-2">
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm h-full">
+          <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 h-full">
             {isAdding || selectedCamera ? (
               <div className="p-6 h-full flex flex-col">
-                <div className="mb-6 border-b border-gray-200 pb-4">
+                <div className="mb-6 border-b border-gray-100 pb-4">
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="text-xl font-semibold text-gray-800">
                       {isAdding ? 'Add New Camera' : selectedCamera?.name}
@@ -400,15 +442,15 @@ const CameraItem = React.memo(({ camera, isSelected, onSelect }: { camera: Camer
   <button 
     onClick={onSelect} 
     className={cn(
-      'group relative flex w-full items-center justify-between rounded-xl border p-4 text-left transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5',
+      'group relative flex w-full items-center justify-between rounded-xl p-4 text-left transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 ring-1',
       isSelected 
-        ? 'border-black bg-gray-50 shadow-md ring-1 ring-black/10' 
-        : 'border-gray-200 bg-white hover:border-gray-300 shadow-sm hover:bg-gray-50'
+        ? 'ring-gray-900 bg-gray-50 shadow-md' 
+        : 'ring-gray-200 bg-white hover:bg-gray-50'
     )}
   >
     {/* Selection Indicator */}
     {isSelected && (
-      <div className="absolute left-0 top-1/2 h-8 w-1 -translate-y-1/2 rounded-r-full bg-black" />
+  <div className="absolute left-0 top-1/2 h-8 w-1 -translate-y-1/2 rounded-r-full bg-gray-900" />
     )}
     
     <div className={cn('flex items-center space-x-3 flex-1 min-w-0', isSelected ? 'pl-3' : 'pl-1')}>
@@ -494,7 +536,7 @@ const CameraItem = React.memo(({ camera, isSelected, onSelect }: { camera: Camer
 CameraItem.displayName = 'CameraItem';
 
 const CameraItemSkeleton = () => (
-  <div className="h-[100px] animate-pulse rounded-xl bg-gray-100 border border-gray-200 p-4">
+  <div className="h-[100px] animate-pulse rounded-xl bg-gray-100 ring-1 ring-gray-200 p-4">
     <div className="flex items-start space-x-3">
       <div className="h-3 w-3 rounded-full bg-gray-300 mt-1"></div>
       <div className="flex-1 space-y-2">

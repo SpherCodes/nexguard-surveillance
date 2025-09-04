@@ -19,15 +19,16 @@ const BottomNav: React.FC = () => {
   return (
     <nav
       className={cn(
-        'fixed bottom-0 inset-x-0 z-50 border-t border-gray-200/70 bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/60',
-        'md:hidden'
+        'fixed bottom-0 inset-x-0 z-50 md:hidden',
+        'border-t border-gray-200/70 bg-white/85 backdrop-blur-xl supports-[backdrop-filter]:bg-white/70',
+        'shadow-[0_-8px_24px_rgba(0,0,0,0.08)]'
       )}
       aria-label="Primary"
       role="navigation"
       // Add iOS safe area padding
-      style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 0.5rem)' }}
+      style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 0.6rem)' }}
     >
-      <ul className="grid grid-cols-3 gap-1 px-2 pt-2 pb-2">
+      <ul className="grid grid-cols-3 gap-1.5 px-3 pt-2.5 pb-2.5">
         {SidebarLinks.map((item) => {
           const isActive = item.route === '/'
             ? pathname === item.route
@@ -40,14 +41,14 @@ const BottomNav: React.FC = () => {
                 href={item.route}
                 aria-current={isActive ? 'page' : undefined}
                 className={cn(
-                  'flex flex-1 items-center justify-center gap-1 rounded-xl px-3 py-2 text-xs font-medium transition-colors',
+                  'flex flex-1 flex-col items-center justify-center gap-1.5 rounded-xl px-3 py-2.5 text-xs font-semibold transition-all duration-200 touch-target focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white/80',
                   isActive
-                    ? 'bg-gray-900 text-white'
-                    : 'text-gray-700 hover:bg-gray-100'
+                    ? 'bg-gray-900 text-white shadow-lg scale-105'
+                    : 'text-gray-600 hover:bg-white hover:text-gray-900 active:scale-95'
                 )}
               >
                 <Icon className="h-5 w-5" aria-hidden="true" />
-                <span className="sr-only sm:not-sr-only sm:ml-1">{item.label}</span>
+                <span className="text-[10px] font-bold truncate">{item.label}</span>
               </Link>
             </li>
           )
