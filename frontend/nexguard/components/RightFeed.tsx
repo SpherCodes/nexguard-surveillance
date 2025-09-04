@@ -69,25 +69,25 @@ const RightFeed = () => {
   )
 
   const EmptyState = () => (
-    <div className="flex flex-col h-full items-center justify-center px-4 py-8">
-      <div className="flex flex-col items-center space-y-4 max-w-sm text-center">
-        <div className="p-3 bg-gray-100 rounded-full">
-          <CalendarIcon className="h-8 w-8 text-gray-400" />
+    <div className="flex flex-col h-full items-center justify-center px-3 sm:px-4 py-6 sm:py-8">
+      <div className="flex flex-col items-center space-y-3 sm:space-y-4 max-w-sm text-center">
+        <div className="p-3 sm:p-4 bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl">
+          <CalendarIcon className="h-6 w-6 sm:h-8 sm:w-8 text-gray-400" />
         </div>
         <div className="space-y-2">
-          <h3 className="text-sm font-medium text-gray-900">No events found</h3>
-          <p className="text-xs text-gray-500 leading-relaxed">
+          <h3 className="text-sm sm:text-base font-semibold text-gray-900">No events found</h3>
+          <p className="text-xs sm:text-sm text-gray-500 leading-relaxed">
             No detection events were recorded on{' '}
             <span className="font-medium text-gray-700">
               {selectedDate.toLocaleDateString('en-US', { 
-                weekday: 'long', 
+                weekday: 'short', 
                 month: 'short', 
                 day: 'numeric' 
               })}
             </span>
           </p>
         </div>
-        <div className="text-xs text-gray-400 bg-gray-50 px-3 py-2 rounded-lg">
+        <div className="text-xs text-gray-400 bg-gray-50 px-3 py-2 rounded-lg border border-gray-200">
           Try selecting a different date
         </div>
       </div>
@@ -95,14 +95,14 @@ const RightFeed = () => {
   )
 
   const ErrorState = () => (
-    <div className="flex flex-col h-full items-center justify-center px-4 py-8">
-      <div className="flex flex-col items-center space-y-4 max-w-sm text-center">
-        <div className="p-3 bg-red-100 rounded-full">
-          <AlertCircle className="h-8 w-8 text-red-500" />
+    <div className="flex flex-col h-full items-center justify-center px-3 sm:px-4 py-6 sm:py-8">
+      <div className="flex flex-col items-center space-y-3 sm:space-y-4 max-w-sm text-center">
+        <div className="p-3 sm:p-4 bg-red-50 rounded-2xl border border-red-100">
+          <AlertCircle className="h-6 w-6 sm:h-8 sm:w-8 text-red-500" />
         </div>
         <div className="space-y-2">
-          <h3 className="text-sm font-medium text-red-900">Unable to load events</h3>
-          <p className="text-xs text-red-600 leading-relaxed">
+          <h3 className="text-sm sm:text-base font-semibold text-red-900">Unable to load events</h3>
+          <p className="text-xs sm:text-sm text-red-600 leading-relaxed">
             There was a problem loading events for{' '}
             {selectedDate.toLocaleDateString('en-US', { 
               month: 'short', 
@@ -112,7 +112,7 @@ const RightFeed = () => {
         </div>
         <button 
           onClick={() => window.location.reload()}
-          className="text-xs bg-red-50 hover:bg-red-100 text-red-700 px-4 py-2 rounded-lg transition-colors"
+          className="text-xs sm:text-sm bg-red-50 hover:bg-red-100 text-red-700 px-4 py-2 rounded-lg transition-colors border border-red-200 font-medium touch-target"
         >
           Retry
         </button>
@@ -121,9 +121,9 @@ const RightFeed = () => {
   )
 
   return (
-    <section className="flex flex-col h-full bg-white">
+  <section className="flex flex-col h-full bg-white md:rounded-r-2xl">
       {/* Header */}
-      <div className="flex items-center justify-between p-2 border-b border-gray-100">
+  <div className="flex items-center justify-between p-2 sm:p-3 border-b border-gray-100">
         <div className="flex items-center space-x-2">
           <button type="button" className="p-1 hover:bg-gray-100 rounded">
             <ListFilter className="h-5 w-5 text-gray-600" />
@@ -143,7 +143,7 @@ const RightFeed = () => {
       </div>
 
       {/* Calendar */}
-      <div className="border-b border-gray-100">
+  <div className="border-b border-gray-100">
         <Calendar
           mode="single"
           selected={selectedDate}
@@ -164,7 +164,7 @@ const RightFeed = () => {
           <ErrorState />
         ) : events.length > 0 ? (
           <div className="h-full overflow-y-auto">
-            <div className="space-y-2 p-2">
+            <div className="space-y-2 p-2 sm:p-3">
               {events.map((event: DetectionEvent) => (
                 <FeedCard key={event.id} alertEvent={event} />
               ))}
