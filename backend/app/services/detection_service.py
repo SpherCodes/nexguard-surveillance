@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 
 from ..Settings import settings
 
-from ..core.models import Detection, Camera
+from ..core.models import Detection, Camera, Media
 from ..schema import DetectionCreate, DetectionUpdate, Detection as DetectionSchema
 from ..utils.database_crud import CRUDBase, DatabaseManager
 
@@ -108,28 +108,19 @@ class DetectionService(CRUDBase[Detection, DetectionCreate, DetectionUpdate]):
             db.commit()
             db.refresh(detection)
         return detection
-
-    def get_detection_stats(self, db: Session, camera_id: Optional[int] = None) -> dict:
-        """Get detection statistics"""
-        query = db.query(Detection)
-        if camera_id:
-            query = query.filter(Detection.camera_id == camera_id)
-        
-        total_detections = query.count()
-        notified_count = query.filter(Detection.notified == True).count()
-        
-        type_stats = {}
-        for detection_type, count in query.with_entities(
-            Detection.detection_type, 
-            Detection.id
-        ).group_by(Detection.detection_type).all():
-            type_stats[detection_type] = count
-        
-        return {
-            "total_detections": total_detections,
-            "notified_count": notified_count,
-            "unnotified_count": total_detections - notified_count
-        }
+    
+    def get_media_filepath( self, db: Session, id: int, media_type: str) -> Optional[str]:
+        """Get the file path of a media item by its ID"""
+        media = db.query(Media).filter(Media.detection_id == id, Media.media_type == media_type).first()
+        if media:
+            # Ensure we return an absolute path using the configured storage directory
+            abs_path = media.path
+            print(f"Media path: {abs_path}")
+            if abs_path:
+                return str(abs_path)
+            # file not found on disk
+            return None
+        return None
 
     def cleanup_old_detections(self, db: Session, days: int = 30) -> int:
         """Remove detections older than specified days"""

@@ -1,7 +1,7 @@
+import { DetectionEvent } from '@/Types';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import {
   Camera,
-  DetectionEvent,
   Zone,
   SystemInfrenceSettings,
   SystemStorageSettings
@@ -145,7 +145,6 @@ export async function getDetectionEventsByDay(day: Date) {
 
   try {
     const formattedDate = day.toISOString().split('T')[0];
-    console.log(`Fetching events for date: ${formattedDate}`);
     const url = `${API_BASE_URL}/api/v1/detections/date/${formattedDate}`;
     const headers = {
       'Content-Type': 'application/json',
@@ -153,8 +152,9 @@ export async function getDetectionEventsByDay(day: Date) {
 
     const response = await fetch(url, { headers });
 
+    console.log(`response for date ${formattedDate}:`, response);
+
     if (response.status === 404) {
-      console.log(`No events found for date: ${formattedDate}`);
       return [];
     }
 
