@@ -26,6 +26,8 @@ def setup_database():
         # Use settings from config
         settings.DATA_DIR.mkdir(parents=True, exist_ok=True)
         db_path = settings.DATA_DIR / "nexguard.db"
+        print(f"Database path: {db_path}")
+        print(f"Using DATABASE_URL: {settings.DATABASE_URL}")
 
         if not db_path.exists():
             print("📦 Database file not found. Applying migrations...")

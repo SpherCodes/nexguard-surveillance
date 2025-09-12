@@ -91,3 +91,8 @@ async def update_storage_settings(
         raise HTTPException(
             status_code=500, detail=f"Internal server error: {str(e)}"
         )
+
+@router.get("/api/health", status_code=200)
+async def health_check():
+    """Health check endpoint for Docker"""
+    return {"status": "healthy"}

@@ -3,27 +3,29 @@ from pathlib import Path
 from pydantic_settings import BaseSettings
 from typing import List, Tuple
 
+import os
 #TODO:Fix importing of environmental variables from .env file
 
 class Settings(BaseSettings):
     """Application configuration settings"""
 
-    # Database Configuration
-    DATABASE_URL: str = "sqlite:///./data/database/nexguard.db"
+    # Database Configuration - will be overridden by env vars
+    DATABASE_URL: str = os.getenv('DATABASE_URL') or "sqlite:///./data/database/nexguard.db"
+
     # Firebase Configuration (service account key file located in this directory)
-    FIREBASE_SERVICE_ACCOUNT: str = str(Path(__file__).parent / "service_key.json")
+    FIREBASE_SERVICE_ACCOUNT: Path = Path("./service_key.json")
 
     # Application Settings
     LOG_LEVEL: str = "INFO"
 
-    # Directories
-    DATA_DIR: Path = Path("./data")
-    STORAGE_DIR: Path = DATA_DIR / "storage"
-    DATABASE_DIR: Path = DATA_DIR / "database"
+    # Directories - configurable via environment
+    # Directories - computed relative to backend root for consistency
+    BACKEND_ROOT: Path = Path(__file__).resolve().parent.parent  # .../backend
+    DATA_DIR: Path = BACKEND_ROOT / "data"
+    STORAGE_DIR: Path = BACKEND_ROOT / "storage"
 
     STORAGE_IMG_DIR: Path = STORAGE_DIR / "images"
     STORAGE_VIDEO_DIR: Path = STORAGE_DIR / "videos"
-    STORAGE_THUMBNAIL_DIR: Path = STORAGE_DIR / "thumbnails"
 
     MODELS_DIR: Path = DATA_DIR / "models"
 
@@ -54,18 +56,15 @@ class Settings(BaseSettings):
     DEBUG: bool = False
 
     class Config:
-        env_file = ".env"
+        env_file = "../.env"  # Points to backend/.env
 
     def __init__(self, **values):
         super().__init__(**values)
         # Ensure directories exist
         self.DATA_DIR.mkdir(parents=True, exist_ok=True)
         self.STORAGE_DIR.mkdir(parents=True, exist_ok=True)
-        self.DATABASE_DIR.mkdir(parents=True, exist_ok=True)
-        self.MODELS_DIR.mkdir(parents=True, exist_ok=True)
         self.STORAGE_IMG_DIR.mkdir(parents=True, exist_ok=True)
         self.STORAGE_VIDEO_DIR.mkdir(parents=True, exist_ok=True)
-        self.STORAGE_THUMBNAIL_DIR.mkdir(parents=True, exist_ok=True)
 
 
 settings = Settings()

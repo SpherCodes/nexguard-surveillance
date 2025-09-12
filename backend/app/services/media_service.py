@@ -17,8 +17,12 @@ logger = logging.getLogger(__name__)
 class MediaService:
     """Service for managing media files and database records"""
     
-    def __init__(self, media_storage_path: str = "media"):
-        self.media_storage_path = Path(media_storage_path)
+    def __init__(self, media_storage_path: Optional[str] = None):
+        if media_storage_path is None:
+            self.media_storage_path = Path(settings.STORAGE_DIR)
+        else:
+            self.media_storage_path = Path(media_storage_path)
+        
         self.media_storage_path.mkdir(parents=True, exist_ok=True)
         
         for media_type in MediaType:

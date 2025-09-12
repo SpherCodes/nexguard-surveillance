@@ -34,7 +34,7 @@ class DetectionEventManager:
     """Manages detection events"""
     def __init__(self, alert_service):
         self.db = next(get_db())  # Get actual session, not generator
-        self.storage_path = Path(settings.STORAGE_DIR)
+        self.storage_path = Path(settings.STORAGE_DIR).resolve()
         self.events = []
         self.alert_service = alert_service
         self.active_recordings: Dict[str, Dict] = {}
@@ -130,7 +130,13 @@ class DetectionEventManager:
                 annotated_frame = self._annotate_frame(frame_data.frame, detection, detection_event.timestamp)
                 cv2.imwrite(str(img_path), annotated_frame)
                 
-                img_rel_path = str(img_path.relative_to(self.storage_path))
+                # Use the already resolved storage path; robust relative calc
+                img_abs = img_path.resolve()
+                try:
+                    img_rel_path = str(img_abs.relative_to(self.storage_path))
+                except ValueError:
+                    # Fallback: compute a relative path via os.path.relpath (handles drive/case issues)
+                    img_rel_path = os.path.relpath(str(img_abs), start=str(self.storage_path))
                 
                 # thumbnail_dir = settings.STORAGE_THUMBNAIL_DIR / camera.name / date_parts[0] / date_parts[1] / date_parts[2]
                 # thumbnail_path = thumbnail_dir / base_filename

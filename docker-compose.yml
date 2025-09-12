@@ -1,0 +1,71 @@
+services:
+  backend:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: nexguard-backend
+    env_file:
+      - ./.env
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/storage:/backend/storage
+    environment:
+      - DATABASE_URL=mssql+pyodbc://sa:${SA_PASSWORD}@db:1433/nexguard_db?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes
+      - YOLO_DEVICE=auto
+      - DEBUG=false
+      - STORAGE_DIR=/backend/storage
+      - DATA_DIR=/app/data
+    depends_on:
+      db:
+        condition: service_healthy
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  frontend:
+    build: 
+      context: ./frontend/nexguard
+      dockerfile: Dockerfile
+    container_name: nexguard-client
+    ports:
+      - "3000:80"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    depends_on:
+      - backend
+  
+  db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: nexguard-db
+    restart: unless-stopped
+    environment:
+      SA_PASSWORD: ${SA_PASSWORD}
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: "Express"
+    ports:
+      - "1433:1433"
+    volumes:
+      - db_data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P ${SA_PASSWORD} -Q 'SELECT 1' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  db_data:
+
+networks:
+  nexguard-network:
+    driver: bridge
