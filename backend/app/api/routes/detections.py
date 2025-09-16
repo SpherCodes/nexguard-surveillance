@@ -1,101 +1,51 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
-from fastapi.responses import FileResponse
-from typing import List, Optional
-import os
-import re
 import json
+from fastapi import APIRouter, HTTPException, Request
+from pathlib import Path
+from fastapi.responses import FileResponse, StreamingResponse
+from typing import List
+import re
+import mimetypes
 import logging
-import subprocess
-from datetime import datetime, timedelta
-import time
-from sqlalchemy.orm import Session
+from datetime import datetime
 
 from ...services.detection_service import detection_service
 
 from ...schema import (
-    Detection, Media
+    Detection
 )
 
 from ...utils.detection_manager import DetectionEventManager
 from ...dependencies import DatabaseDep, get_db
+from ...Settings import Settings
 
 router = APIRouter()
 logger = logging.getLogger("nexguard.detections")
+settings = Settings()
 
-
-def _resolve_storage_dir() -> str:
-    storage_dir = os.getenv("STORAGE_DIR")
-    if storage_dir:
-        return os.path.abspath(storage_dir)
-    # fallback to backend/app/data/storage
-    return os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "data", "storage"))
-
-
-def _ensure_path(video_path: str) -> str:
-    """Resolve video_path to an absolute path and keep it within storage dir."""
-    storage_dir = _resolve_storage_dir()
-    if not os.path.isabs(video_path):
-        video_path = os.path.normpath(os.path.join(storage_dir, video_path))
-    video_path_abs = os.path.abspath(video_path)
-    # safety: ensure inside storage_dir
-    storage_dir_abs = os.path.abspath(storage_dir)
-    try:
-        if os.path.commonpath([video_path_abs, storage_dir_abs]) != storage_dir_abs:
-            raise HTTPException(status_code=403, detail="Forbidden")
-    except ValueError:
-        # commonpath can raise on Windows with different drives
-        raise HTTPException(status_code=403, detail="Forbidden")
-    return video_path_abs
-
-
-def _is_browser_friendly(file_path: str) -> bool:
-    """Best-effort check using ffprobe for H.264/AVC video."""
-    try:
-        result = subprocess.run(
-            [
-                "ffprobe", "-v", "error",
-                "-select_streams", "v:0",
-                "-show_entries", "stream=codec_name",
-                "-of", "json",
-                file_path,
-            ],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        info = json.loads(result.stdout or "{}")
-        streams = info.get("streams", [])
-        if not streams:
-            return False
-        codec = (streams[0].get("codec_name") or "").lower()
-        return codec in ("h264", "avc1")
-    except Exception as e:
-        logger.warning("ffprobe failed for %s: %s", file_path, e)
-        # If probe fails, do not block playback; return True to attempt serve
-        return True
-
-
-def _maybe_convert(file_path: str) -> Optional[str]:
-    """Convert to H.264/AAC MP4 with faststart; returns new path or None on failure."""
-    try:
-        base, ext = os.path.splitext(os.path.basename(file_path))
-        out_dir = os.path.dirname(file_path)
-        out_path = os.path.join(out_dir, f"{base}_web.mp4")
-        subprocess.run(
-            [
-                "ffmpeg", "-y", "-i", file_path,
-                "-c:v", "libx264", "-c:a", "aac",
-                "-movflags", "+faststart",
-                out_path,
-            ],
-            check=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-        return out_path if os.path.exists(out_path) else None
-    except Exception as e:
-        logger.error("ffmpeg convert failed for %s: %s", file_path, e)
-        return None
+@router.get("/debug/list")
+async def debug_list_detections(db: DatabaseDep):
+    """Debug endpoint to list all detections and their media"""
+    from ...core.models import Detection, Media
+    
+    detections = db.query(Detection).all()
+    result = []
+    
+    for detection in detections:
+        media_records = db.query(Media).filter(Media.detection_id == detection.id).all()
+        result.append({
+            "detection_id": detection.id,
+            "timestamp": detection.timestamp,
+            "media": [
+                {
+                    "id": media.id,
+                    "type": media.media_type,
+                    "path": media.path
+                }
+                for media in media_records
+            ]
+        })
+    
+    return result
 
 @router.get("/date/{date}", response_model=List[Detection])
 async def get_recent_detections(
@@ -116,61 +66,94 @@ async def get_recent_detections(
     
     return detections
 
-@router.get("/media/video/{detection_id}", response_class=FileResponse)
+@router.get("/media/video/{detection_id}")
 async def get_detection_video(
     detection_id: int,
     request: Request,
     db: DatabaseDep,
 ):
-    """get detection video by detection ID"""
+    """Stream detection video by ID with proper range support"""
+    print(f"Requesting video for detection_id={detection_id}")
+    
     try:
-        video_path = detection_service.get_media_filepath(db=db, id=detection_id, media_type="video")
-        if not video_path:
+        video_path_str = detection_service.get_media_filepath(db=db, id=detection_id, media_type="video")
+        
+        if not video_path_str:
             raise HTTPException(status_code=404, detail="Video not found")
-        # resolve and validate path
-        print(f"Video path before ensure: {video_path}")
-        video_path = _ensure_path(video_path)
-        if not os.path.exists(video_path):
-            print(f"Video path does not exist: {video_path}")
-            raise HTTPException(status_code=404, detail="Video file not found")
 
-        print(f"Serving video path: {video_path}")
-        # check format and optionally convert
-        if not _is_browser_friendly(video_path):
-            converted = _maybe_convert(video_path)
-            if converted and os.path.exists(converted):
-                video_path = converted
-
-        file_size = os.path.getsize(video_path)
+        video_path = Path(video_path_str)
+        if not video_path.exists():
+            raise HTTPException(status_code=404, detail="Video file does not exist")
+        
+        print(f"Serving video from: {video_path}")
+        
+        file_size = video_path.stat().st_size
         range_header = request.headers.get("range") or request.headers.get("Range")
         
+        base_headers = {
+            "Accept-Ranges": "bytes",
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Headers": "Range",
+        }
+
         if range_header:
+            # Parse Range header
             m = re.match(r"bytes=(\d*)-(\d*)", range_header.strip(), flags=re.I)
             if not m:
                 raise HTTPException(status_code=416, detail="Invalid Range header")
-            start_str, end_str = m.group(1), m.group(2)
+
+            start_str, end_str = m.groups()
             start = int(start_str) if start_str else 0
             end = int(end_str) if end_str else file_size - 1
-            # clamp
+
+            # Clamp values
             start = max(0, min(start, file_size - 1))
             end = max(0, min(end, file_size - 1))
+            
             if start > end:
                 raise HTTPException(status_code=416, detail="Invalid Range values")
-            
-            chunk_size = (end - start) + 1
-            with open(video_path, "rb") as f:
-                f.seek(start)
-                data = f.read(chunk_size)
-            
+
+            chunk_size = end - start + 1
             headers = {
+                **base_headers,
                 "Content-Range": f"bytes {start}-{end}/{file_size}",
-                "Accept-Ranges": "bytes",
                 "Content-Length": str(chunk_size),
                 "Content-Type": "video/mp4",
             }
-            return Response(data, status_code=206, headers=headers, media_type="video/mp4")
+            
+            print(f"Serving range {start}-{end} of {file_size} bytes")
+            return StreamingResponse(
+                iter_file(video_path, start, end),
+                status_code=206,
+                headers=headers,
+                media_type="video/mp4"
+            )
 
-        return FileResponse(video_path, media_type="video/mp4")
+        # If no Range header, return full file
+        headers = {
+            **base_headers,
+            "Content-Length": str(file_size),
+            "Content-Type": "video/mp4",
+        }
+        return FileResponse(video_path, media_type="video/mp4", headers=headers)
+
     except Exception as e:
         logger.exception("Error retrieving video for detection_id=%s", detection_id)
         raise HTTPException(status_code=500, detail=f"Error retrieving video: {str(e)}")
+
+
+def iter_file(file_path: Path, start: int, end: int, chunk_size: int = 1024*1024):
+    """Generator to read file in chunks"""
+    with file_path.open("rb") as f:
+        f.seek(start)
+        remaining = end - start + 1
+        while remaining > 0:
+            read_size = min(chunk_size, remaining)
+            data = f.read(read_size)
+            if not data:
+                break
+            yield data
+            remaining -= len(data)

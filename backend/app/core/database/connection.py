@@ -6,6 +6,8 @@ from backend.app.Settings import Settings
 
 settings = Settings()
 
+print(f"Using DATABASE_URL: {settings.DATABASE_URL}")
+
 engine = create_engine(
     settings.DATABASE_URL,
     connect_args={"check_same_thread": False} if "sqlite" in settings.DATABASE_URL else {}

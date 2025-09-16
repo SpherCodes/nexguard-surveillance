@@ -15,13 +15,16 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 # Import your models
 from core.models import Base
+from Settings import Settings
+
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
+settings = Settings()
 
 #Load the database url from env
-db_url = os.getenv("DATABASE_URL")
+db_url = os.getenv("DATABASE_URL", settings.DATABASE_URL)
 if db_url:
     config.set_main_option("sqlalchemy.url", db_url)
 else:    

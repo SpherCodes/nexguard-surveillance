@@ -53,10 +53,13 @@ async def update_inference_settings(
         if not inference_settings:
             raise HTTPException(status_code=404, detail="Inference settings not found")
 
-        # Update the settings
+        # Update the settings (store relative paths in database)
         inference_settings.model = settings.model
         inference_settings.min_detection_threshold = settings.confidence
-        inference_settings.model_path = settings.model_path
+        # Ensure model_path is stored as relative
+        if settings.model_path:
+            from ...Settings import settings as app_settings
+            inference_settings.model_path = app_settings.get_relative_model_path(settings.model_path)
         inference_settings.updated_at = datetime.now()
 
         db.commit()

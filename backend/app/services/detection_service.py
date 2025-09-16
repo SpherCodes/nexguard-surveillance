@@ -64,14 +64,13 @@ class DetectionService(CRUDBase[Detection, DetectionCreate, DetectionUpdate]):
         start_of_day = date
         end_of_day   = start_of_day + timedelta(days=1)
 
-        # eager-load all media
         query = (
             db.query(Detection)
-              .options(joinedload(Detection.media))
-              .filter(
-                  Detection.timestamp >= start_of_day.timestamp(),
-                  Detection.timestamp <  end_of_day.timestamp()
-              )
+            .options(joinedload(Detection.media))
+            .filter(
+                Detection.timestamp >= start_of_day.timestamp(),
+                Detection.timestamp <  end_of_day.timestamp()
+            )
         )
 
         if camera_id:
@@ -84,7 +83,9 @@ class DetectionService(CRUDBase[Detection, DetectionCreate, DetectionUpdate]):
                 det.image_media = [m for m in det.media if m.media_type == "image"]
                 #Load image data if available
                 for m in det.image_media:
-                    abs_path = Path(settings.STORAGE_DIR) / m.path
+                    print(f"Loading image data for media id {m.id} from path {m.path}")
+                    abs_path = settings.get_absolute_path(m.path)
+                    print(f"Absolute path: {abs_path}")
                     if abs_path.exists():
                         with open(abs_path, "rb") as f:
                             m.image_data = base64.b64encode(f.read()).decode("ascii")
@@ -110,15 +111,15 @@ class DetectionService(CRUDBase[Detection, DetectionCreate, DetectionUpdate]):
         return detection
     
     def get_media_filepath( self, db: Session, id: int, media_type: str) -> Optional[str]:
-        """Get the file path of a media item by its ID"""
+        """Get the file path of a media item by its ID (return Absolute path if exists)"""
         media = db.query(Media).filter(Media.detection_id == id, Media.media_type == media_type).first()
+        
         if media:
-            # Ensure we return an absolute path using the configured storage directory
-            abs_path = media.path
-            print(f"Media path: {abs_path}")
-            if abs_path:
+            abs_path = settings.get_absolute_path(media.path)
+            print(f"Resolved media path: {abs_path}")
+
+            if abs_path.exists():
                 return str(abs_path)
-            # file not found on disk
             return None
         return None
 
