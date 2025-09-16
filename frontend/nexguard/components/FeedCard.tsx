@@ -29,7 +29,6 @@ const FeedCard = ({ alertEvent}: FeedProps) => {
   })
 
   const handleCardClick = (id: string) => {
-    console.log('Card clicked with ID:', id);
     router.push(`/replay?id=${id}`);
   }
 
