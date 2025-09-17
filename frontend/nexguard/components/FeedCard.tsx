@@ -2,8 +2,10 @@ import { FeedProps } from '@/Types'
 import React from 'react'
 import Image from 'next/image'
 import { cn } from '@/lib/utils'
+import { useRouter } from 'next/navigation'
 
-const FeedCard = ({ alertEvent }: FeedProps) => {
+const FeedCard = ({ alertEvent}: FeedProps) => {
+  const router = useRouter();
   const thumbnailBase64 = alertEvent.image_media?.[0]?.imageData;
   const thumbnailSrc = thumbnailBase64
     ? thumbnailBase64.startsWith('data:')
@@ -26,8 +28,13 @@ const FeedCard = ({ alertEvent }: FeedProps) => {
     second: '2-digit',
   })
 
+  const handleCardClick = (id: string) => {
+    router.push(`/replay?id=${id}`);
+  }
+
   return (
-    <div className="group bg-white rounded-2xl ring-1 ring-gray-200 p-3 hover:shadow-sm hover:ring-gray-300 transition-all duration-200 w-full max-w-full overflow-hidden">
+    <div className="group bg-white rounded-2xl ring-1 ring-gray-200 p-3 hover:shadow-sm hover:ring-gray-300 transition-all duration-200 w-full max-w-full overflow-hidden"
+      onClick={() => handleCardClick(alertEvent.id)}>
       {/* Compact Header */}
       <div className="flex items-center justify-between mb-3 min-w-0">
         <div className="min-w-0 flex-1">

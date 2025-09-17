@@ -17,10 +17,12 @@ logger = logging.getLogger(__name__)
 class MediaService:
     """Service for managing media files and database records"""
     
-    def __init__(self, media_storage_path: str = "media"):
-        self.media_storage_path = Path(media_storage_path)
+    def __init__(self):
+        # Use settings for storage paths
+        self.media_storage_path = settings.STORAGE_DIR
         self.media_storage_path.mkdir(parents=True, exist_ok=True)
         
+        # Create subdirectories for each media type
         for media_type in MediaType:
             (self.media_storage_path / media_type.value).mkdir(exist_ok=True)
     
@@ -34,13 +36,11 @@ class MediaService:
         Persist a new media record and return it as a Pydantic MediaSchema.
         """
         try:
+            # Always work with absolute paths for file operations
             if Path(media_data.path).is_absolute():
                 file_path = Path(media_data.path)
             else:
-                file_path = Path(settings.STORAGE_DIR) / media_data.path
-            
-            if file_content is None and not file_path.exists():
-                raise InvalidMediaError(f"Media file not found at path: {file_path}")
+                file_path = settings.get_absolute_path(media_data.path)
             
             if file_content:
                 stored_path = self._store_file_content(
@@ -48,8 +48,12 @@ class MediaService:
                     media_data.media_type,
                     media_data.camera_id
                 )
-                media_data.path = str(stored_path)
+                # Store relative path in database
+                media_data.path = settings.get_relative_path(stored_path)
                 media_data.size_bytes = len(file_content)
+            else:
+                # Ensure we store relative path in database
+                media_data.path = settings.get_relative_path(file_path)
             
             if media_data.size_bytes is None and file_path.exists():
                 media_data.size_bytes = file_path.stat().st_size
@@ -240,7 +244,8 @@ class MediaService:
         if not db_media:
             raise MediaNotFoundError(f"Media with ID {media_id} not found")
         
-        file_path = db_media.path
+        # Convert relative path to absolute for file operations
+        file_path = settings.get_absolute_path(db_media.path)
         
         try:
             # Delete database record
@@ -248,9 +253,9 @@ class MediaService:
             db.commit()
             
             # Delete physical file if requested and exists
-            if delete_file and file_path and os.path.exists(file_path):
+            if delete_file and file_path and file_path.exists():
                 try:
-                    os.remove(file_path)
+                    file_path.unlink()
                     logger.info(f"Deleted media file: {file_path}")
                 except OSError as e:
                     logger.warning(f"Could not delete media file {file_path}: {str(e)}")
@@ -351,15 +356,16 @@ class MediaService:
         
         for media in old_media:
             try:
-                file_path = media.path
+                # Convert relative path to absolute for file operations
+                file_path = settings.get_absolute_path(media.path)
                 
                 # Delete database record
                 db.delete(media)
                 
                 # Delete physical file if requested
-                if delete_files and file_path and os.path.exists(file_path):
+                if delete_files and file_path and file_path.exists():
                     try:
-                        os.remove(file_path)
+                        file_path.unlink()
                     except OSError as e:
                         logger.warning(f"Could not delete old media file {file_path}: {str(e)}")
                 
@@ -391,11 +397,14 @@ class MediaService:
         """
         media = await self.get_media_by_id(db, media_id)
         
-        if not os.path.exists(media.path):
-            raise MediaNotFoundError(f"Media file not found at path: {media.path}")
+        # Convert relative path to absolute for file operations
+        file_path = settings.get_absolute_path(media.path)
+        
+        if not file_path.exists():
+            raise MediaNotFoundError(f"Media file not found at path: {file_path}")
         
         try:
-            with open(media.path, 'rb') as f:
+            with open(file_path, 'rb') as f:
                 return f.read()
         except Exception as e:
             logger.error(f"Error reading media file {media.path}: {str(e)}")
@@ -406,7 +415,7 @@ class MediaService:
         content: bytes,
         media_type: MediaType,
         camera_id: int
-    ) -> Path:
+    ) -> str:
         """
         Store file content to disk
         
@@ -416,7 +425,7 @@ class MediaService:
             camera_id: Camera ID
             
         Returns:
-            Path where file was stored
+            Relative path where file was stored
             
         Raises:
             MediaStorageError: If storage fails
@@ -444,7 +453,8 @@ class MediaService:
                 f.write(content)
             
             logger.info(f"Stored media file: {file_path}")
-            return file_path
+            # Return relative path for database storage
+            return settings.get_relative_path(file_path)
             
         except Exception as e:
             logger.error(f"Error storing media file: {str(e)}")

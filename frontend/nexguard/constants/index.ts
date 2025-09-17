@@ -21,8 +21,8 @@ export const SidebarLinks = [
     icon: Settings,
   },
   {
-    label: 'Events',
-    route: '/events',
+    label: 'Replay',
+    route: '/replay',
     icon: Video,
   }
 

@@ -30,6 +30,7 @@ class DetectionUpdate(BaseModel):
 
 class Detection(DetectionBase):
     """Complete detection schema with database fields"""
+    id: int
     created_at: datetime
     image_media: Optional[List['Media']] = Field([], description="Associated image media")
     video_media: Optional[List['Media']] = Field([], description="Associated video media")

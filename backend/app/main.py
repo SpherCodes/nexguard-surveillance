@@ -60,8 +60,6 @@ async def lifespan(app: FastAPI):
 
         # Get cameras using the service layer
         cameras = camera_service.get_active_cameras(db)
-        print(f"🎥 Starting {len(cameras)} active camera(s)...")
-        print(f"Infrence instance:{inference_engine}")
 
         for camera in cameras:
             # Create CameraConfig instance

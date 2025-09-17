@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 
 from ..Settings import settings
 
-from ..core.models import Detection, Camera
+from ..core.models import Detection, Camera, Media
 from ..schema import DetectionCreate, DetectionUpdate, Detection as DetectionSchema
 from ..utils.database_crud import CRUDBase, DatabaseManager
 
@@ -64,14 +64,13 @@ class DetectionService(CRUDBase[Detection, DetectionCreate, DetectionUpdate]):
         start_of_day = date
         end_of_day   = start_of_day + timedelta(days=1)
 
-        # eager-load all media
         query = (
             db.query(Detection)
-              .options(joinedload(Detection.media))
-              .filter(
-                  Detection.timestamp >= start_of_day.timestamp(),
-                  Detection.timestamp <  end_of_day.timestamp()
-              )
+            .options(joinedload(Detection.media))
+            .filter(
+                Detection.timestamp >= start_of_day.timestamp(),
+                Detection.timestamp <  end_of_day.timestamp()
+            )
         )
 
         if camera_id:
@@ -84,7 +83,9 @@ class DetectionService(CRUDBase[Detection, DetectionCreate, DetectionUpdate]):
                 det.image_media = [m for m in det.media if m.media_type == "image"]
                 #Load image data if available
                 for m in det.image_media:
-                    abs_path = Path(settings.STORAGE_DIR) / m.path
+                    print(f"Loading image data for media id {m.id} from path {m.path}")
+                    abs_path = settings.get_absolute_path(m.path)
+                    print(f"Absolute path: {abs_path}")
                     if abs_path.exists():
                         with open(abs_path, "rb") as f:
                             m.image_data = base64.b64encode(f.read()).decode("ascii")
@@ -108,28 +109,19 @@ class DetectionService(CRUDBase[Detection, DetectionCreate, DetectionUpdate]):
             db.commit()
             db.refresh(detection)
         return detection
+    
+    def get_media_filepath( self, db: Session, id: int, media_type: str) -> Optional[str]:
+        """Get the file path of a media item by its ID (return Absolute path if exists)"""
+        media = db.query(Media).filter(Media.detection_id == id, Media.media_type == media_type).first()
+        
+        if media:
+            abs_path = settings.get_absolute_path(media.path)
+            print(f"Resolved media path: {abs_path}")
 
-    def get_detection_stats(self, db: Session, camera_id: Optional[int] = None) -> dict:
-        """Get detection statistics"""
-        query = db.query(Detection)
-        if camera_id:
-            query = query.filter(Detection.camera_id == camera_id)
-        
-        total_detections = query.count()
-        notified_count = query.filter(Detection.notified == True).count()
-        
-        type_stats = {}
-        for detection_type, count in query.with_entities(
-            Detection.detection_type, 
-            Detection.id
-        ).group_by(Detection.detection_type).all():
-            type_stats[detection_type] = count
-        
-        return {
-            "total_detections": total_detections,
-            "notified_count": notified_count,
-            "unnotified_count": total_detections - notified_count
-        }
+            if abs_path.exists():
+                return str(abs_path)
+            return None
+        return None
 
     def cleanup_old_detections(self, db: Session, days: int = 30) -> int:
         """Remove detections older than specified days"""
