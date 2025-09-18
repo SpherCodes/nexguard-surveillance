@@ -1,6 +1,6 @@
 from typing import List, Optional
 from sqlalchemy.orm import Session
-from datetime import date, datetime
+from datetime import  datetime
 
 from ..core.models import Camera, Zone
 from ..schema import CameraCreate, CameraUpdate, Camera as CameraSchema

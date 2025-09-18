@@ -1,8 +1,8 @@
-from pylibsrtp import Session
+from sqlalchemy.orm import Session
 
 from ..schema.user import UserStatus
 
-from ..core.models import Zone
+from ..core.models import AIModels, Zone
 from ..core.models import InferenceSettings, StorageSettings
 from ..core.models import User
 from ..services.auth_service import auth_service
@@ -10,12 +10,24 @@ from ..services.auth_service import auth_service
 
 def seed_default_settings(session:Session):
     """Seed default inference and storage settings"""
-    # Create default inference settings
-    default_inference = InferenceSettings(
-        model="yolo11n",
-        min_detection_threshold=0.5
-    )
-    session.add(default_inference)
+    # Ensure default AI model exists, then link inference settings to it
+    model_name = "yolo11n"
+    model_path = "models/yolo11n.pt"
+
+    ai_model = session.query(AIModels).filter_by(name=model_name).first()
+    if not ai_model:
+        ai_model = AIModels(name=model_name, description=f"Default {model_name} model", path=model_path)
+        session.add(ai_model)
+        session.flush()
+
+    # Create default inference settings referencing the model id
+    default_inference = session.query(InferenceSettings).first()
+    if not default_inference:
+        default_inference = InferenceSettings(
+            model_id=ai_model.id,
+            min_detection_threshold=0.5
+        )
+        session.add(default_inference)
 
     # Create default storage settings
     default_storage = StorageSettings(
@@ -37,16 +49,26 @@ def seed_default_zones(db):
 def seed_detection_models(db):
     """Seed default detection models"""
     models = [
-        {"name": "yolo11n", "path": "models/yolo11n.pt"},
-        {"name": "yolo12n", "path": "models/yolo12n.pt"}
+        {"name": "yolo11n", "path": "backend/models/yolo11n.pt"}
     ]
     
     for model in models:
-        exists = db.query(InferenceSettings).filter_by(model=model["name"]).first()
-        if not exists:
+        # Ensure AI model exists
+        ai_model = db.query(AIModels).filter_by(name=model["name"]).first()
+        if not ai_model:
+            ai_model = AIModels(
+                name=model["name"],
+                description=f"Default {model['name']} model",
+                path=model["path"]
+            )
+            db.add(ai_model)
+            db.flush()
+
+        # Ensure inference settings reference this model
+        exists_is = db.query(InferenceSettings).filter_by(model_id=ai_model.id).first()
+        if not exists_is:
             inference_settings = InferenceSettings(
-                model=model["name"],
-                model_path=model["path"],
+                model_id=ai_model.id,
                 min_detection_threshold=0.5
             )
             db.add(inference_settings)

@@ -60,7 +60,8 @@ export async function getCamera(id: string): Promise<Camera | null> {
 
 export async function updateCamera(
   id: number,
-  updates: Camera): Promise<Camera> {
+  updates: Camera
+): Promise<Camera> {
   try {
     console.log('Updating camera:', { id, updates });
     const url = `${API_BASE_URL}/api/v1/cameras/${id}`;
@@ -147,7 +148,7 @@ export async function getDetectionEventsByDay(day: Date) {
     const formattedDate = day.toISOString().split('T')[0];
     const url = `${API_BASE_URL}/api/v1/detections/date/${formattedDate}`;
     const headers = {
-      'Content-Type': 'application/json',
+      'Content-Type': 'application/json'
     };
 
     const response = await fetch(url, { headers });
@@ -210,13 +211,16 @@ export async function getZones(): Promise<Zone[]> {
     throw error;
   }
 }
-export async function createZone(zoneName: string, zoneDescription: string): Promise<Zone> {
+export async function createZone(
+  zoneName: string,
+  zoneDescription: string
+): Promise<Zone> {
   try {
     const url = `${API_BASE_URL}/api/v1/zones/`;
-    const  payload = {
+    const payload = {
       name: zoneName,
-      zoneDescription: zoneDescription,
-    }
+      zoneDescription: zoneDescription
+    };
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -252,7 +256,8 @@ export async function getInferenceSettings(): Promise<SystemInfrenceSettings> {
     const data = await response.json();
     return {
       model: data.model,
-      min_detection_threshold: data.min_detection_threshold
+      min_detection_threshold: data.min_detection_threshold,
+      available_models: data.available_models
     } as SystemInfrenceSettings;
   } catch (error) {
     console.error('Error fetching inference settings:', error);
