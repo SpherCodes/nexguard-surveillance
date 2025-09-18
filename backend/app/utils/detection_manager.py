@@ -13,7 +13,7 @@ import cv2
 import numpy as np
 
 from ..core.models import User
-from ..core.database.connection import get_db  # Temporary fix for circular dependency injection
+from ..core.database.connection import get_db
 
 from ..services.camera_service import camera_service
 from ..services.media_service import media_service

@@ -50,12 +50,23 @@ const SystemSettings = () => {
 
 
   const { mutate: saveInferenceConfig } = useMutation({
-    mutationFn: (data: InferenceFormData) => updateInferenceSettings(data),
+    mutationFn: (values: InferenceFormData) => {
+      // Ensure we only send the fields that can be updated
+      const data = {
+        model: values.model,
+        min_detection_threshold: values.min_detection_threshold
+      };
+      console.log('Sending inference update:', data);
+      return updateInferenceSettings(data);
+    },
     onSuccess: () => {
-      toast.success('Inference settings updated');
+      toast.success('Inference settings updated successfully');
       queryClient.invalidateQueries({ queryKey: ['inferenceSettings'] });
     },
-    onError: () => toast.error('Failed to update inference settings'),
+    onError: (error) => {
+      console.error('Failed to update inference settings:', error);
+      toast.error('Failed to update inference settings');
+    },
   });
 
   const { mutate: saveStorageConfig} = useMutation({
@@ -102,7 +113,7 @@ const SystemSettings = () => {
       case 'inference':
         return <InferenceForm
           initialData={inferenceSettings}
-          onSave={(data : InferenceFormData) => saveInferenceConfig(data)}
+          onSave={(data : InferenceFormData) => { saveInferenceConfig(data); console.log(data); }}
           isLoading={isLoading}
         />;
       case 'storage':
@@ -220,18 +231,21 @@ export default SystemSettings;
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="yolov11n">
-                        <div className="flex flex-col py-1">
-                          <span className="font-semibold">YOLOv11 Nano</span>
-                          <span className="text-xs text-gray-500">Fastest performance</span>
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="yolov11s">
-                        <div className="flex flex-col py-1">
-                          <span className="font-semibold">YOLOv11 Small</span>
-                          <span className="text-xs text-gray-500">Balanced accuracy & speed</span>
-                        </div>
-                      </SelectItem>
+                      {initialData?.available_models?.map((model) => (
+                        <SelectItem key={model.id} value={model.name}>
+                          <div className="flex flex-col py-1">
+                            <span className="font-semibold">{model.name.toUpperCase()}</span>
+                            <span className="text-xs text-gray-500">{model.description || 'AI Detection Model'}</span>
+                          </div>
+                        </SelectItem>
+                      )) || (
+                        <SelectItem value="yolo11n">
+                          <div className="flex flex-col py-1">
+                            <span className="font-semibold">YOLO11N</span>
+                            <span className="text-xs text-gray-500">Default model</span>
+                          </div>
+                        </SelectItem>
+                      )}
                     </SelectContent>
                   </Select>
                   <FormDescription className="text-gray-600 text-xs">Choose the AI model for object detection performance</FormDescription>

@@ -32,6 +32,12 @@ interface Camera {
 interface SystemInfrenceSettings {
   model: string;
   min_detection_threshold: number;
+  available_models?: {
+    id: number;
+    name: string;
+    description?: string;
+    path: string;
+  }[];
 }
 
 interface SystemStorageSettings {

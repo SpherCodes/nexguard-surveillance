@@ -21,6 +21,7 @@ from .services.detection_service import detection_service
 from .services.video_capture import VideoCapture
 from .services.inference_engine import YOLOProcessor as InferenceEngine
 from .utils.detection_manager import DetectionEventManager
+from .services.sys_config_service import SysConfigService
 
 _video_capture: Optional[VideoCapture] = None
 _inference_engine: Optional[InferenceEngine] = None
@@ -37,11 +38,28 @@ def get_video_capture() -> VideoCapture:
 
 def get_inference_engine() -> InferenceEngine:
     """Get inference engine instance with detection manager"""
+    sys_config_service = get_sys_config_service()
+    sysInferenceConfig = sys_config_service.get_inference_config(next(get_db()))
     global _inference_engine
     if _inference_engine is None:
+        # Find the model path from available models by matching the current model name
+        model_path = None
+        if sysInferenceConfig.available_models:
+            for model in sysInferenceConfig.available_models:
+                if model.name == sysInferenceConfig.model:
+                    model_path = model.path
+                    break
+        
+        if not model_path:
+            raise ValueError(f"Model path not found for model: {sysInferenceConfig.model}")
+            
         detection_manager = get_detection_event_manager()
-        _inference_engine = InferenceEngine(detection_manager=detection_manager)
+        _inference_engine = InferenceEngine(model_path=model_path,conf_threshold=sysInferenceConfig.min_detection_threshold,detection_manager=detection_manager)
     return _inference_engine
+
+def get_sys_config_service() -> SysConfigService:
+    """Get system configuration service instance"""
+    return SysConfigService()
 
 def get_database_session() -> Generator[Session, None, None]:
     """Get database session for FastAPI dependency injection"""

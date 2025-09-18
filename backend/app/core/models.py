@@ -69,17 +69,20 @@ class Media(Base):
     # Relationships
     camera = relationship("Camera", back_populates="media")
     detection = relationship("Detection", back_populates="media")
-
-
 class InferenceSettings(Base):
     __tablename__ = "inference_settings"
 
     id = Column(Integer, primary_key=True)
-    min_detection_threshold = Column(Float, default=0.5)
-    model = Column(String(100), default="yolo11n")
-    model_path = Column(String(500), nullable=True, default="models/yolo11n.pt")
-    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
-
+    min_detection_threshold = Column(Float, default=0.5, nullable=False, index=True)
+    model_id = Column(Integer, ForeignKey("ai_models.id"), nullable=True)
+    
+class AIModels(Base):
+    __tablename__ = "ai_models"
+    
+    id = Column(Integer, primary_key=True)
+    name = Column(String(100), unique=True, nullable=False)
+    description = Column(String(500), nullable=True)
+    path = Column(String(500), nullable=False)
 
 class StorageSettings(Base):
     __tablename__ = "storage_settings"
