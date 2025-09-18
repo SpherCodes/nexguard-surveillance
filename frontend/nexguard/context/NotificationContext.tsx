@@ -9,7 +9,7 @@ import {
   unsubscribeFromTopic,
 } from '@/lib/actions/notification.actions';
 import { onMessageListener } from '@/lib/firebase';
-import { toast } from 'sonner';
+import { notifications } from '@/lib/services/notification.service';
 
 interface NotificationContextType {
   currentDeviceToken: string | null;
@@ -26,8 +26,7 @@ export const NotificationContext = createContext<NotificationContextType | null>
 export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [currentDeviceToken, setToken] = useState<string | null>(null);
   const [notificationPermission, setPermission] = useState<NotificationPermission>('default');
-
-  const isSupported = typeof window !== 'undefined' && 'Notification' in window && 'serviceWorker' in navigator;
+  const [tokens, setTokens] = useState<string[]>([]);
 
   // Request permission and fetch token
   const refreshToken = async () => {
@@ -36,6 +35,8 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
       if (t) {
         await registerDeviceToken(t);
         setToken(t);
+        // keep a simple in-memory list of tokens for the context
+        setTokens((prev) => Array.from(new Set([...prev, t])));
         localStorage.setItem('device_token', t);
         setPermission('granted');
       } else {
@@ -51,6 +52,7 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
     if (currentDeviceToken) {
       await unregisterDeviceToken(currentDeviceToken);
       localStorage.removeItem('device_token');
+      setTokens((prev) => prev.filter((tok) => tok !== currentDeviceToken));
       setToken(null);
       setPermission('denied');
     } else {
@@ -71,17 +73,21 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
   useEffect(() => {
     // Load existing token from localStorage
     const localToken = localStorage.getItem('device_token');
-    if (localToken) setToken(localToken);
+    if (localToken) {
+      setToken(localToken);
+      setTokens([localToken]);
+    }
 
     setPermission(Notification.permission);
 
     // Listen for foreground messages
     onMessageListener()
-      .then((payload: any) => {
-        if (payload.notification) {
-          toast(payload.notification.title || 'New Notification', {
-            description: payload.notification.body,
-          });
+      .then((payload) => {
+        if (payload?.notification) {
+          const title = payload.notification.title || 'New Notification';
+          const description = payload.notification.body;
+
+          notifications.detection(title, { description });
         }
       })
       .catch((err) => console.error('Error listening for messages', err));
@@ -92,7 +98,7 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
       value={{
         currentDeviceToken,
         notificationPermission,
-        isSupported,
+        tokens,
         refreshToken,
         toggleNotifications,
         subscribeToTopic,

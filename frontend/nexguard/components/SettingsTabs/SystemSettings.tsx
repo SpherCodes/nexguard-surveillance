@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner';
+import { notifications } from '@/lib/services/notification.service';
 import { cn, inferenceSchema, storageSchema } from '@/lib/utils';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -60,22 +60,26 @@ const SystemSettings = () => {
       return updateInferenceSettings(data);
     },
     onSuccess: () => {
-      toast.success('Inference settings updated successfully');
+      notifications.settingsUpdated('Inference Settings');
       queryClient.invalidateQueries({ queryKey: ['inferenceSettings'] });
     },
     onError: (error) => {
       console.error('Failed to update inference settings:', error);
-      toast.error('Failed to update inference settings');
+      notifications.error('Failed to update inference settings', {
+        description: 'Please check your settings and try again.'
+      });
     },
   });
 
   const { mutate: saveStorageConfig} = useMutation({
     mutationFn: (data: StorageFormData) => updateStorageSettings(data),
     onSuccess: () => {
-      toast.success('Storage settings updated');
+      notifications.settingsUpdated('Storage Settings');
       queryClient.invalidateQueries({ queryKey: ['systemStorageSettings'] });
     },
-    onError: () => toast.error('Failed to update storage settings'),
+    onError: () => notifications.error('Failed to update storage settings', {
+      description: 'Please check your configuration and try again.'
+    }),
   });
 
   const renderActivePanel = () => {
@@ -457,19 +461,23 @@ const AccessControlForm = ({ users, currentUser }: AccessControlFormProps) => {
      mutationFn: ({ userId, status }: { userId: number; status: NonNullable<User['status']> }) =>
        updateUserStatus(userId, status),
     onSuccess: () => {
-      toast.success('User status updated');
+      notifications.settingsUpdated('User Status');
       queryClient.invalidateQueries({ queryKey: ['adminUsers'] });
     },
-    onError: (e: Error) => toast.error(e.message || 'Failed to update status'),
+    onError: (e: Error) => notifications.error('Failed to update user status', {
+      description: e.message || 'Please try again.'
+    }),
   });
 
   const { mutate: mutateDelete, isPending: isDeletingUser } = useMutation({
     mutationFn: (userId: number) => deleteUser(userId),
     onSuccess: () => {
-      toast.success('User deleted');
+      notifications.userAction('User deleted successfully');
       queryClient.invalidateQueries({ queryKey: ['adminUsers'] });
     },
-    onError: (e: Error) => toast.error(e.message || 'Failed to delete user'),
+    onError: (e: Error) => notifications.error('Failed to delete user', {
+      description: e.message || 'Please try again.'
+    }),
   });
 
   const formatRole = (role?: User['role']) => {
@@ -641,11 +649,15 @@ const AccessControlForm = ({ users, currentUser }: AccessControlFormProps) => {
                             const isAdminTarget = user.role === 'admin' || user.role === 'super_admin';
                             const allowed = canManageAdminUsers || !isAdminTarget;
                             if (!allowed) {
-                              toast.error('Insufficient privileges to modify admin users');
+                              notifications.error('Insufficient privileges', {
+                                description: 'You cannot modify admin users'
+                              });
                               return;
                             }
                             if (user.id === currentUser?.id) {
-                              toast.error('You cannot change your own status');
+                              notifications.error('Cannot modify own status', {
+                                description: 'You cannot change your own status'
+                              });
                               return;
                             }
                             mutateStatus({ userId: user.id, status: v as NonNullable<User['status']> });

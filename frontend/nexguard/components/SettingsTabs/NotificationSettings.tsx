@@ -1,7 +1,6 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-// borderless redesign; not using Card primitives here
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
@@ -9,7 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { useNotifications } from '@/hooks/useNotifications'
 import { Bell, BellOff, Megaphone, User, AlertTriangle } from 'lucide-react'
 import { notificationPreferencesAPI, NotificationPreferences } from '../../lib/actions/notificationPreferencesAPI'
-import { toast } from 'sonner'
+import { notifications } from '@/lib/services/notification.service'
 
 const getPreferenceDescription = (key: string): string => {
   switch (key) {
@@ -44,7 +43,7 @@ const getPreferenceIcon = (key: string) => {
 // removed color helper to keep a single primary theme
 
 const NotificationSettings: React.FC = () => {
-  const { currentDeviceToken, notificationPermission, toggleNotifications } = useNotifications();  
+  const { currentDeviceToken, notificationPermission, toggleNotifications } = useNotifications(); 
 
   const [preferences, setPreferences] = useState<NotificationPreferences>({
     push_notifications: false,
@@ -62,9 +61,10 @@ const NotificationSettings: React.FC = () => {
         setLoading(true)
         const savedPreferences = await notificationPreferencesAPI.getPreferences()
         setPreferences(savedPreferences)
-      } catch (error) {
-        console.error('Failed to load notification preferences:', error)
-        toast.error('Failed to load notification preferences')
+      } catch {
+        notifications.error('Failed to load notification preferences', {
+          description: 'Please refresh the page and try again.'
+        })
       } finally {
         setLoading(false)
       }
@@ -84,10 +84,12 @@ const NotificationSettings: React.FC = () => {
       // Save to backend
       await notificationPreferencesAPI.updatePreferences(newPreferences)
       
-      toast.success('Notification preferences updated successfully')
+      notifications.settingsUpdated('Notification Preferences')
     } catch (error) {
       console.error(`Error updating ${key} preference:`, error)
-      toast.error('Failed to update notification preferences')
+      notifications.error('Failed to update notification preferences', {
+        description: 'Please try again.'
+      })
       
       // Revert the change if there was an error
       setPreferences(prev => ({ ...prev, [key]: !checked }))
