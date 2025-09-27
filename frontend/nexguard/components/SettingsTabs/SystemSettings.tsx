@@ -13,7 +13,7 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel } fr
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { systemSettingsNav } from '@/constants';
 import { Loader2, Save, Users, Trash2, Brain, Database, Shield } from 'lucide-react';
 import { InfrenceFormProps, StorageFormProps} from '@/Types';
@@ -196,6 +196,12 @@ export default SystemSettings;
   type InferenceFormData = z.infer<typeof inferenceSchema>;
   const InferenceForm = ({ initialData, onSave, isLoading }: InfrenceFormProps) => {
   const form = useForm<InferenceFormData>({ resolver: zodResolver(inferenceSchema), defaultValues: initialData });
+
+  useEffect(() => {
+    if (initialData) {
+      form.reset(initialData);
+    }
+  }, [initialData, form]);
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(data => onSave(data))} className="space-y-6 sm:space-y-8 h-full">
@@ -228,7 +234,7 @@ export default SystemSettings;
               <FormField control={form.control} name="model" render={({ field }) => (
                 <FormItem className="space-y-3">
                   <FormLabel className="text-sm font-semibold text-gray-900">Detection Model</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger className="h-12 sm:h-11 border-0 bg-gray-50 hover:bg-gray-100 focus:bg-white focus:ring-2 focus:ring-gray-900/20 transition-all rounded-xl shadow-sm">
                         <SelectValue placeholder="Choose a model" />
@@ -240,6 +246,7 @@ export default SystemSettings;
                           <div className="flex flex-col py-1">
                             <span className="font-semibold">{model.name.toUpperCase()}</span>
                             <span className="text-xs text-gray-500">{model.description || 'AI Detection Model'}</span>
+                            <span className="text-[11px] text-gray-400">{model.path}</span>
                           </div>
                         </SelectItem>
                       )) || (
@@ -261,16 +268,16 @@ export default SystemSettings;
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <FormLabel className="text-sm font-semibold text-gray-900">Confidence Threshold</FormLabel>
                     <div className="text-sm font-bold bg-gray-900 text-white px-4 py-2 rounded-xl shadow-sm">
-                      {Math.round(field.value * 100)}%
+                      {Math.round((field.value ?? 0.5) * 100)}%
                     </div>
                   </div>
                   <FormControl>
                     <div className="bg-gray-50 rounded-2xl p-6">
                       <Slider 
-                        defaultValue={[field.value * 100]} 
+                        value={[Math.round(((field.value ?? 0.5) * 100))]} 
                         max={100} 
                         step={1} 
-                        onValueChange={(v) => field.onChange(v[0] / 100)}
+                        onValueChange={(v) => field.onChange((v[0] ?? 0) / 100)}
                         className="py-3"
                       />
                       <div className="flex justify-between text-xs text-gray-500 mt-3">

@@ -9,13 +9,13 @@ import time
 import threading
 import queue
 from dataclasses import dataclass
-from typing import List, Tuple, Dict, Optional, Any
+from typing import List, Tuple, Dict, Optional, Any, Union
 
 
 @dataclass
 class CameraConfig:
     """Configuration for a camera source."""
-    camera_id: str
+    camera_id: Union[int, str]
     url: str  # RTSP URL, file path, or camera index (0, 1, etc.)
     fps_target: int = 15
     resolution: Tuple[int, int] = (1280, 720)  # (width, height)
@@ -28,7 +28,7 @@ class CameraConfig:
 class FrameData:
     """Container for a processed frame and its metadata."""
     
-    def __init__(self, frame: np.ndarray, camera_id: str, timestamp: float, 
+    def __init__(self, frame: np.ndarray, camera_id: Union[int, str], timestamp: float, 
         frame_number: int, resolution: Tuple[int, int]):
         self.frame = frame
         self.camera_id = camera_id
@@ -43,13 +43,13 @@ class VideoCapture:
     """Handles video capture from multiple sources."""
     
     def __init__(self):
-        self.cameras: Dict[int, CameraConfig] = {}
-        self.streams: Dict[str, Any] = {}
-        self.frame_buffers: Dict[str, queue.Queue] = {}
-        self.stop_flags: Dict[str, bool] = {}
-        self.threads: Dict[str, threading.Thread] = {}
-        self.last_frame_time: Dict[str, float] = {}
-        self.frame_counts: Dict[str, int] = {}
+        self.cameras: Dict[Union[int, str], CameraConfig] = {}
+        self.streams: Dict[Union[int, str], Any] = {}
+        self.frame_buffers: Dict[Union[int, str], queue.Queue] = {}
+        self.stop_flags: Dict[Union[int, str], bool] = {}
+        self.threads: Dict[Union[int, str], threading.Thread] = {}
+        self.last_frame_time: Dict[Union[int, str], float] = {}
+        self.frame_counts: Dict[Union[int, str], int] = {}
         
     def add_camera(self, config: CameraConfig) -> bool:
         """Add a camera to be monitored."""
@@ -60,22 +60,24 @@ class VideoCapture:
         self.frame_buffers[config.camera_id] = queue.Queue(maxsize=config.buffer_size)
         self.stop_flags[config.camera_id] = False
         self.frame_counts[config.camera_id] = 0
+        self.last_frame_time[config.camera_id] = time.time()
         return True
     
     def remove_camera(self, camera_id: str) -> bool:
         """Remove a camera from monitoring."""
         if camera_id not in self.cameras:
             return False
-        
-        # Stop the thread if it's running
-        if camera_id in self.threads and self.threads[camera_id].is_alive():
-            self.stop_camera(camera_id)
-        
-        del self.cameras[camera_id]
-        del self.frame_buffers[camera_id]
-        del self.stop_flags[camera_id]
-        del self.frame_counts[camera_id]
-        
+
+        self.stop_camera(camera_id)
+
+        self.cameras.pop(camera_id, None)
+        self.frame_buffers.pop(camera_id, None)
+        self.stop_flags.pop(camera_id, None)
+        self.frame_counts.pop(camera_id, None)
+        self.last_frame_time.pop(camera_id, None)
+        self.streams.pop(camera_id, None)
+        self.threads.pop(camera_id, None)
+
         return True
     
     def update_camera(self, config: CameraConfig) -> bool:
@@ -121,35 +123,70 @@ class VideoCapture:
     
     def stop_all_cameras(self):
         """Stop all running camera threads."""
-        for camera_id in self.threads.keys():
-            if self.threads[camera_id].is_alive():
+        for camera_id, thread in list(self.threads.items()):
+            if thread and thread.is_alive():
                 self.stop_flags[camera_id] = True
-                
-        for camera_id in self.threads.keys():
-            if self.threads[camera_id].is_alive():
-                self.threads[camera_id].join(timeout=3.0)
-                
+
+        for camera_id, thread in list(self.threads.items()):
+            if thread and thread.is_alive():
+                thread.join(timeout=3.0)
+
         # Close all stream connections
         for stream in self.streams.values():
             if stream is not None:
                 stream.release()
-                
+
         self.streams.clear()
-    def stop_camera(self, camera_id: str):
+        self.threads.clear()
+
+    def stop_camera(self, camera_id: str) -> bool:
         """Stop capturing from a specific camera."""
-        if camera_id in self.threads and self.threads[camera_id].is_alive():
-            self.stop_flags[camera_id] = True
-            self.threads[camera_id].join(timeout=3.0)
-        
-        if camera_id in self.streams and self.streams[camera_id] is not None:
-            self.streams[camera_id].release()
+        if camera_id not in self.cameras:
+            return False
+
+        self.stop_flags[camera_id] = True
+
+        thread = self.threads.get(camera_id)
+        if thread and thread.is_alive():
+            thread.join(timeout=3.0)
+
+        stream = self.streams.get(camera_id)
+        if stream is not None:
+            stream.release()
             self.streams[camera_id] = None
-        
-        if camera_id in self.frame_buffers:
-            del self.frame_buffers[camera_id]
-        
-        if camera_id in self.cameras:
-            del self.cameras[camera_id]
+
+        buffer = self.frame_buffers.get(camera_id)
+        if buffer is not None:
+            while not buffer.empty():
+                try:
+                    buffer.get_nowait()
+                except queue.Empty:
+                    break
+
+        self.threads.pop(camera_id, None)
+        return True
+
+    def start_camera(self, camera_id: str) -> bool:
+        """Start capturing from a specific camera if it's enabled."""
+        if camera_id not in self.cameras:
+            print(f"Camera {camera_id} not registered with video capture")
+            return False
+
+        config = self.cameras[camera_id]
+        if not config.enabled:
+            print(f"Camera {camera_id} is disabled; cannot start capture")
+            return False
+
+        if camera_id in self.threads and self.threads[camera_id] and self.threads[camera_id].is_alive():
+            return True
+
+        self._start_camera_thread(camera_id)
+        return True
+
+    def is_camera_active(self, camera_id: str) -> bool:
+        """Check if a camera capture thread is currently running."""
+        thread = self.threads.get(camera_id)
+        return bool(thread and thread.is_alive())
 
     def _start_camera_thread(self, camera_id: str):
         """Start a thread for capturing from a specific camera."""
@@ -363,11 +400,7 @@ class VideoCapture:
         return status
     
     def is_camera_running(self, camera_id: str) -> bool:
-        """Check if a camera is currently running"""
-        if camera_id not in self.cameras:
-            return False
-        
-        # Assuming self.threads contains the active camera threads
-        return (camera_id in self.threads and self.threads[camera_id].is_alive())
+        """Compatibility method for legacy callers."""
+        return self.is_camera_active(camera_id)
     
-video_capture  = VideoCapture()
+video_capture = VideoCapture()

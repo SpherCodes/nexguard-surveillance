@@ -6,13 +6,12 @@ from contextlib import asynccontextmanager
 import uvicorn
 from pathlib import Path
 
-from .core.database.connection import Base, engine, SessionLocal, create_tables
-from .core.models import Camera
+from .core.database.connection import SessionLocal, create_tables
 from .services.camera_service import camera_service
 from .Settings import settings
 from .data.seed import seed_default_settings, seed_default_zones, seed_default_user
 from .dependencies import get_video_capture , get_inference_engine
-from .services.video_capture import CameraConfig, VideoCapture
+from .services.video_capture import CameraConfig
 from .api.router import api_router
 
 def setup_database():

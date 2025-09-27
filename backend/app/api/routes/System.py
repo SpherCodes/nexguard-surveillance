@@ -6,7 +6,7 @@ from typing import Dict, Any, Optional
 from ...services.sys_config_service import SysConfigService
 from ...schema.sysconfig import SysInferenceConfig
 
-from ...dependencies import DatabaseDep, get_sys_config_service
+from ...dependencies import DatabaseDep, get_sys_config_service, ensure_inference_engine
 
 #TODO: Refactor the settings endpoint to use a settings service 
 # instead of direct database access
@@ -53,6 +53,7 @@ async def update_inference_settings(
 ):
     try:
         updated_config = sys_config_service.update_inference_settings(db, settings)
+        ensure_inference_engine(updated_config)
         return updated_config
     except Exception as e:
         raise HTTPException(

@@ -2,6 +2,8 @@ import asyncio
 import threading
 import numpy as np
 import time
+from pathlib import Path
+from typing import Optional
 from ultralytics import YOLO
 import queue
 
@@ -22,7 +24,8 @@ class YOLOProcessor:
             conf_threshold (float): Confidence threshold for detections.
             detection_manager: Injected DetectionEventManager instance
         """
-        self.model = YOLO(model_path)
+        self.model: Optional[YOLO] = None
+        self.model_path: Optional[Path] = None
         self.conf_threshold = conf_threshold
         self.processing_threads = {}
         self.video_capture = None
@@ -30,8 +33,29 @@ class YOLOProcessor:
         self.results_buffer = {}
         self.display_buffers = {}
         self.processing_stats = {}
+        self._model_lock = threading.Lock()
         
         self.detection_manager = detection_manager
+
+        if model_path:
+            self.load_model(model_path, conf_threshold=conf_threshold)
+
+    def load_model(self, model_path: str | Path, conf_threshold: Optional[float] = None) -> None:
+        """Load or swap the YOLO model used for inference."""
+        resolved_path = Path(model_path)
+        if not resolved_path.exists():
+            raise FileNotFoundError(f"Model file not found: {resolved_path}")
+
+        with self._model_lock:
+            print(f"🧠 Loading YOLO model from {resolved_path}")
+            self.model = YOLO(str(resolved_path))
+            self.model_path = resolved_path
+            if conf_threshold is not None:
+                self.conf_threshold = conf_threshold
+
+    def set_conf_threshold(self, conf_threshold: float) -> None:
+        """Update the detection confidence threshold."""
+        self.conf_threshold = conf_threshold
 
     def connect_video_capture(self, video_capture):
         """Connect to an existing VideoCapture instance."""
@@ -58,6 +82,9 @@ class YOLOProcessor:
             raise RuntimeError("No video_capture instance available. Either pass it as parameter or call connect_video_capture() first.")
         
         self.video_capture = vc
+
+        if self.model is None:
+            raise RuntimeError("Inference engine has no model loaded. Call load_model() first.")
         
         if camera_ids is None:
             camera_ids = [
@@ -101,18 +128,22 @@ class YOLOProcessor:
         """
         # Get all processing threads if none specified
         if camera_ids is None:
-            camera_ids = self.processing_thread.keys()
-        
+            camera_ids = list(self.processing_threads.keys())
+
         # Set stop flags
         for camera_id in camera_ids:
-            if camera_id in self.processing_threads and self.processing_threads[camera_id].is_alive():
+            if camera_id in self.stop_flags:
                 self.stop_flags[camera_id] = True
-        
+
         for camera_id in camera_ids:
-            if camera_id in self.processing_threads and self.processing_threads[camera_id].is_alive():
-                self.processing_threads[camera_id].join(timeout=3.0)
-                del self.processing_threads[camera_id]
+            thread = self.processing_threads.get(camera_id)
+            if thread and thread.is_alive():
+                thread.join(timeout=3.0)
                 print(f"Stopped YOLO processing for camera {camera_id}")
+            self.processing_threads.pop(camera_id, None)
+            self.results_buffer.pop(camera_id, None)
+            self.processing_stats.pop(camera_id, None)
+            self.stop_flags.pop(camera_id, None)
         
     def _process_camera_stream(self, camera_id: str):
         """
@@ -137,6 +168,9 @@ class YOLOProcessor:
                 
             last_frame_number = frame_data.frame_number
             
+            if self.model is None:
+                raise RuntimeError("Inference engine model was unloaded during processing")
+
             # Process frame with YOLO
             results = self.model(frame_data.frame, conf=self.conf_threshold, verbose=False)
             # Clear previous detections
