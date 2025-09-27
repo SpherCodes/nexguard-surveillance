@@ -4,7 +4,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner';
+import { notifications } from '@/lib/services/notification.service';
 import { cn } from '@/lib/utils';
 import {
   Settings as SettingsIcon,
@@ -82,9 +82,11 @@ function CameraSettings() {
       queryClient.invalidateQueries({ queryKey: ['cameras'] });
       setIsAdding(false);
       setSelectedCameraId(savedCamera.cameraId);
-      toast.success(`Camera '${savedCamera.name}' saved successfully`);
+      notifications.cameraAction(`Camera '${savedCamera.name}' saved successfully`);
     },
-    onError: (err: Error) => toast.error(`Save failed: ${err.message}`),
+    onError: (err: Error) => notifications.error('Failed to save camera', {
+      description: err.message
+    }),
   });
 
   const { mutateAsync: createZoneMutate } = useMutation({
@@ -97,9 +99,11 @@ function CameraSettings() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cameras'] });
       setDeleteDialogOpen(false);
-      toast.success('Camera removed successfully');
+      notifications.cameraAction('Camera removed successfully');
     },
-    onError: (err: Error) => toast.error(`Delete failed: ${err.message}`),
+    onError: (err: Error) => notifications.error('Failed to delete camera', {
+      description: err.message
+    }),
   });
 
   const handleSelectCamera = (id: number) => {

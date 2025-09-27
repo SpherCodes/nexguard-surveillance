@@ -15,11 +15,6 @@ from .dependencies import get_video_capture , get_inference_engine
 from .services.video_capture import CameraConfig, VideoCapture
 from .api.router import api_router
 
-video_capture = get_video_capture()
-inference_engine = get_inference_engine()
-
-
-
 def setup_database():
     """Initialize and migrate database if missing"""
     try:
@@ -47,8 +42,6 @@ def setup_database():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("Starting NexGuard API...")
-    
     setup_database()
     create_tables()
 
@@ -56,14 +49,13 @@ async def lifespan(app: FastAPI):
     try:
         seed_default_settings(db)
         seed_default_zones(db)
-        # Seed default admin user
         seed_default_user(db)
-        print("✅ Database tables created successfully")
+        
+        video_capture = get_video_capture()
+        inference_engine = get_inference_engine()
 
         # Get cameras using the service layer
         cameras = camera_service.get_active_cameras(db)
-        print(f"🎥 Starting {len(cameras)} active camera(s)...")
-        print(f"Infrence instance:{inference_engine}")
 
         for camera in cameras:
             # Create CameraConfig instance

@@ -3,26 +3,28 @@ from fastapi import APIRouter, Depends, HTTPException
 from datetime import datetime
 from typing import Dict, Any, Optional
 
-from ...dependencies import DatabaseDep, get_detection_event_manager
+from ...services.sys_config_service import SysConfigService
+from ...schema.sysconfig import SysInferenceConfig
+
+from ...dependencies import DatabaseDep, get_sys_config_service
 
 #TODO: Refactor the settings endpoint to use a settings service 
 # instead of direct database access
 
-from ...schema.settings import InferenceSettings, StorageSettings
-from ...core.models import InferenceSettings as inference_model, StorageSettings as storage_model
+from ...schema.settings import StorageSettings
+from ...core.models import StorageSettings as storage_model
 
 router = APIRouter()
 
-@router.get("/inference",response_model=InferenceSettings)
+@router.get("/inference", response_model=SysInferenceConfig)
 async def get_system_config(
     db: DatabaseDep,
-):
+    sys_config_service: SysConfigService = Depends(get_sys_config_service)
+) -> SysInferenceConfig:
     try:
-        inference_settings = db.query(inference_model).first()
-        if not inference_settings:
-            raise HTTPException(status_code=404, detail="Inference settings not found")
-
-        return InferenceSettings.model_validate(inference_settings)
+        inference_settings = sys_config_service.get_inference_config(db)
+        print(f"this the inference_config: {inference_settings}")
+        return inference_settings
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Internal server error: {str(e)}"
@@ -33,7 +35,7 @@ async def get_storage_config(
     db: DatabaseDep,
 ):
     try:
-        storage_settings = db.query(inference_model).first()
+        storage_settings = db.query(storage_model).first()
         if not storage_settings:
             raise HTTPException(status_code=404, detail="Storage settings not found")
 
@@ -43,26 +45,15 @@ async def get_storage_config(
             status_code=500, detail=f"Internal server error: {str(e)}"
         )
 
-@router.put("/inference", response_model=InferenceSettings)
+@router.put("/inference", response_model=SysInferenceConfig)
 async def update_inference_settings(
-    settings: InferenceSettings,
+    settings: SysInferenceConfig,
     db: DatabaseDep,
+    sys_config_service: SysConfigService = Depends(get_sys_config_service)
 ):
     try:
-        inference_settings = db.query(inference_model).first()
-        if not inference_settings:
-            raise HTTPException(status_code=404, detail="Inference settings not found")
-
-        # Update the settings
-        inference_settings.model = settings.model
-        inference_settings.min_detection_threshold = settings.confidence
-        inference_settings.model_path = settings.model_path
-        inference_settings.updated_at = datetime.now()
-
-        db.commit()
-        db.refresh(inference_settings)
-
-        return InferenceSettings.model_validate(inference_settings)
+        updated_config = sys_config_service.update_inference_settings(db, settings)
+        return updated_config
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Internal server error: {str(e)}"

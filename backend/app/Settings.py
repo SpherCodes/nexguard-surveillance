@@ -1,32 +1,30 @@
 import os
 from pathlib import Path
 from pydantic_settings import BaseSettings
-from typing import List, Tuple
-
-import os
-#TODO:Fix importing of environmental variables from .env file
+from typing import Tuple
 
 class Settings(BaseSettings):
     """Application configuration settings"""
 
-    # Database Configuration - will be overridden by env vars
-    DATABASE_URL: str = os.getenv('DATABASE_URL') or "sqlite:///./data/database/nexguard.db"
+    # Project roots - calculate from backend/app/Settings.py location
+    BACKEND_ROOT: Path = Path(__file__).resolve().parent.parent  # Points to backend/
+    PROJECT_ROOT: Path = BACKEND_ROOT.parent  # Points to project root
 
-    # Firebase Configuration (service account key file located in this directory)
-    FIREBASE_SERVICE_ACCOUNT: Path = Path("./service_key.json")
+    # Database Configuration
+    DATABASE_URL: str = os.getenv('DATABASE_URL') or f"sqlite:///{BACKEND_ROOT / 'app' / 'data' / 'database' / 'nexguard.db'}"
+
+    # Firebase Configuration
+    FIREBASE_SERVICE_ACCOUNT: Path = BACKEND_ROOT / "app" / "service_key.json"
 
     # Application Settings
     LOG_LEVEL: str = "INFO"
 
-    # Directories - configurable via environment
-    # Directories - computed relative to backend root for consistency
-    BACKEND_ROOT: Path = Path(__file__).resolve().parent.parent  # .../backend
+    # Storage & Data Directories
     DATA_DIR: Path = BACKEND_ROOT / "data"
     STORAGE_DIR: Path = BACKEND_ROOT / "storage"
 
     STORAGE_IMG_DIR: Path = STORAGE_DIR / "images"
     STORAGE_VIDEO_DIR: Path = STORAGE_DIR / "videos"
-
     MODELS_DIR: Path = DATA_DIR / "models"
 
     # API Settings
@@ -40,9 +38,9 @@ class Settings(BaseSettings):
 
     # Detection and Alert Settings
     MIN_CONFIDENCE: float = 0.5
-    DETECTION_COOLDOWN: int = 30  # seconds between alerts for same detection type
+    DETECTION_COOLDOWN: int = 30
     ENABLE_ALERT_NOTIFICATIONS: bool = True
-    ALERT_NOTIFICATION_TIMEOUT: int = 10  # seconds
+    ALERT_NOTIFICATION_TIMEOUT: int = 10
     
     # WebRTC Configuration
     ICE_SERVERS: str = "stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302"
@@ -56,15 +54,51 @@ class Settings(BaseSettings):
     DEBUG: bool = False
 
     class Config:
-        env_file = "../.env"  # Points to backend/.env
+        env_file = "../.env" 
+        frozen = True
 
     def __init__(self, **values):
         super().__init__(**values)
-        # Ensure directories exist
-        self.DATA_DIR.mkdir(parents=True, exist_ok=True)
-        self.STORAGE_DIR.mkdir(parents=True, exist_ok=True)
-        self.STORAGE_IMG_DIR.mkdir(parents=True, exist_ok=True)
-        self.STORAGE_VIDEO_DIR.mkdir(parents=True, exist_ok=True)
-
+        for path in [self.DATA_DIR, self.MODELS_DIR, self.STORAGE_DIR, self.STORAGE_IMG_DIR, self.STORAGE_VIDEO_DIR]:
+            path.mkdir(parents=True, exist_ok=True)
+    
+    def get_absolute_path(self, relative_path: str) -> Path:
+        """Convert a relative path to absolute based on storage directory"""
+        if Path(relative_path).is_absolute():
+            return Path(relative_path)
+        return self.STORAGE_DIR / relative_path
+    
+    def get_relative_path(self, absolute_path: str | Path) -> str:
+        """Convert an absolute path to relative based on storage directory"""
+        abs_path = Path(absolute_path)
+        try:
+            # Try to make it relative to STORAGE_DIR
+            relative = abs_path.relative_to(self.STORAGE_DIR)
+            return str(relative)
+        except ValueError:
+            # If it's not under STORAGE_DIR, return as-is
+            return str(abs_path)
+    
+    def get_absolute_model_path(self, relative_path: str) -> Path:
+        """Convert a relative model path to absolute based on models directory"""
+        if Path(relative_path).is_absolute():
+            return Path(relative_path)
+        return self.MODELS_DIR / relative_path
+    
+    def get_relative_model_path(self, absolute_path: str | Path) -> str:
+        """Convert an absolute model path to relative based on models directory"""
+        abs_path = Path(absolute_path)
+        try:
+            # Try to make it relative to MODELS_DIR
+            relative = abs_path.relative_to(self.MODELS_DIR)
+            return str(relative)
+        except ValueError:
+            # Try relative to PROJECT_ROOT for backwards compatibility
+            try:
+                relative = abs_path.relative_to(self.PROJECT_ROOT)
+                return str(relative)
+            except ValueError:
+                # If it's not under MODELS_DIR or PROJECT_ROOT, return as-is
+                return str(abs_path)
 
 settings = Settings()

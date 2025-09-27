@@ -44,6 +44,8 @@ function Home() {
   })
 
   const isLoading = zonesLoading || camerasLoading
+  console.log('isLoading is :',isLoading)
+
 
   // Derive grid classes based on density and viewport
   const gridClass = useMemo(() => {

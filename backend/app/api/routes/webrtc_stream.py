@@ -22,8 +22,7 @@ async def webrtc_signaling(
     websocket: WebSocket,
     camera_id: int,
     video_capture: VideoCapture = Depends(get_video_capture),
-    inference_engine: inference_engine = Depends(get_inference_engine),
-    detection_event_manager: DetectionEventManager = Depends(get_detection_event_manager)
+    inference_engine: inference_engine = Depends(get_inference_engine)
 ):
     """WebRTC signaling for camera streaming"""
     print('Connecting WebRTC client to camera:', camera_id)

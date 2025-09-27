@@ -7,7 +7,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import React, { useState } from 'react'
 import { cn } from '@/lib/utils'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { toast } from 'sonner'
+import { notifications } from '@/lib/services/notification.service'
 import { getCurrentUser, signOut as signOutAction } from '@/lib/actions/user.actions'
 import type { User } from '@/Types'
 
@@ -36,10 +36,12 @@ const Sidebar = () => {
     mutationFn: () => signOutAction(),
     onSuccess: () => {
       queryClient.clear()
-      toast.success('Signed out')
+      notifications.success('Signed out successfully')
       router.push('/sign-in')
     },
-    onError: () => toast.error('Failed to sign out'),
+    onError: () => notifications.error('Failed to sign out', {
+      description: 'Please try again.'
+    }),
   })
   return (
     <TooltipProvider delayDuration={0}>

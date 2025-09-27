@@ -34,13 +34,13 @@ export function updateCameraInCache(
 }
 
 export const checkAuthStatus = async () => {
-    try {
-      const currentUser = await getCurrentUser();
-      return currentUser;
-    } catch (error) {
-      return null;
-    }
-  };
+  try {
+    const currentUser = await getCurrentUser();
+    return currentUser;
+  } catch (error) {
+    return null;
+  }
+};
 /**
  * Hook-based version that provides the queryClient automatically
  * Use this in React components
@@ -62,7 +62,7 @@ export const cameraFormSchema = z.object({
 
 export const inferenceSchema = z.object({
   model: z.string(),
-  min_detection_threshold: z.number().min(0).max(100)
+  min_detection_threshold: z.number().min(0).max(1).step(0.01)
 });
 
 export const storageSchema = z.object({
@@ -108,4 +108,3 @@ export const authFormSchema = (type: 'Sign-up' | 'Sign-in') => {
       message: "Passwords don't match"
     });
 };
-
