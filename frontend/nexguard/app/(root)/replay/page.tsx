@@ -1,9 +1,9 @@
 'use client'
 import VideoPlayer from '@/components/VideoPlayer'
 import { useSearchParams } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 
-export default function Replay() {
+function ReplayContent() {
   const searchParams = useSearchParams();
   const [currentId, setCurrentId] = useState<string | null>(null);
 
@@ -20,5 +20,13 @@ export default function Replay() {
     <div className="w-full h-80 flex flex-col justify-center items-center mt-10">
       <VideoPlayer id={currentId!} />
     </div>
+  )
+}
+
+export default function Replay() {
+  return (
+    <Suspense fallback={<p>Loading...</p>}>
+      <ReplayContent />
+    </Suspense>
   )
 }

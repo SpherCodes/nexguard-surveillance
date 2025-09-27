@@ -1,6 +1,5 @@
 from datetime import datetime
 from typing import Optional
-from isort import file
 from pydantic import BaseModel, Field, field_validator, validator
 from enum import Enum
 

@@ -4,12 +4,9 @@ import queue
 from aiortc import RTCPeerConnection, RTCSessionDescription, VideoStreamTrack, RTCIceCandidate, RTCConfiguration, RTCIceServer
 from av import VideoFrame
 import cv2
-from fastapi.params import Depends
 import numpy as np
-from typing import Dict, Optional
+from typing import Dict
 import time
-
-from ..schema.FrameData import FrameData
 
 class CameraStreamTrack(VideoStreamTrack):
     """A video stream track that captures frames from the inference engine"""

@@ -219,8 +219,6 @@ The project includes pre-configured code quality tools:
 # Format code with Black
 black backend/ scripts/
 
-# Sort imports with isort
-isort backend/ scripts/
 
 # Lint with Ruff (modern replacement for flake8)
 ruff check backend/ scripts/

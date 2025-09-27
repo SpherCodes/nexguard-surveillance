@@ -6,13 +6,12 @@ from contextlib import asynccontextmanager
 import uvicorn
 from pathlib import Path
 
-from .core.database.connection import Base, engine, SessionLocal, create_tables
-from .core.models import Camera
+from .core.database.connection import SessionLocal, create_tables
 from .services.camera_service import camera_service
 from .Settings import settings
 from .data.seed import seed_default_settings, seed_default_zones, seed_default_user
 from .dependencies import get_video_capture , get_inference_engine
-from .services.video_capture import CameraConfig, VideoCapture
+from .services.video_capture import CameraConfig
 from .api.router import api_router
 
 def setup_database():
@@ -86,7 +85,9 @@ async def lifespan(app: FastAPI):
         print("🎬 All enabled cameras started")
 
     except Exception as e:
+        import traceback
         print(f"❌ Failed to initialize cameras: {e}")
+        traceback.print_exc()
         raise
     finally:
         db.close()
@@ -122,12 +123,11 @@ async def root():
     return {"message": "Welcome to the NexGuard API!"}
 
 
-@app.get("/health")
+@app.get("/api/health")
 async def health_check():
     return {
         "status": "healthy",
-        "database_url": settings.DATABASE_URL,
-        "debug_mode": settings.DEBUG
+        "database_url": settings.DATABASE_URL
     }
 
 

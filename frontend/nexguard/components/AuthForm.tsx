@@ -79,12 +79,12 @@ const AuthForm = ({type}: {type: 'Sign-in' | 'Sign-up'}) => {
                     setError('Login failed. Please check your credentials.');
                 }
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Authentication failed:', error);
             
             let errorMessage = 'An unexpected error occurred. Please try again.';
             
-            if (error?.message) {
+            if (error && typeof error === 'object' && 'message' in error && typeof error.message === 'string') {
                 errorMessage = error.message;
             } else if (typeof error === 'string') {
                 errorMessage = error;

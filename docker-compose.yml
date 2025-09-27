@@ -1,4 +1,31 @@
 services:
+  # Remove the existing db-init service (SQL Server specific)
+  # Remove the existing db service (SQL Server)
+  
+  # New PostgreSQL database service
+  db:
+    image: postgres:15-alpine
+    container_name: nexguard-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: nexguard_db
+      POSTGRES_USER: nexguard_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-NexGuard2024!}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nexguard_user -d nexguard_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    profiles:
+      - default
+      - gpu
+
   backend:
     build: 
       context: ./backend
@@ -10,13 +37,52 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./backend/storage:/backend/storage
+      - ./backend/storage:/app/storage
+      - ./backend/data:/app/data
+      - ./models:/app/data/models
     environment:
-      - DATABASE_URL=mssql+pyodbc://sa:${SA_PASSWORD}@db:1433/nexguard_db?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes
-      - YOLO_DEVICE=auto
+      # Updated database URL for PostgreSQL
+      - DATABASE_URL=postgresql+psycopg2://nexguard_user:${POSTGRES_PASSWORD:-NexGuard2024!}@db:5432/nexguard_db
+      - YOLO_DEVICE=${YOLO_DEVICE:-cpu}
       - DEBUG=false
-      - STORAGE_DIR=/backend/storage
+      - STORAGE_DIR=/app/storage
       - DATA_DIR=/app/data
+      - MODELS_DIR=/app/data/models
+      - PYTHONPATH=/app
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    profiles:
+      - default
+
+  backend-gpu:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: nexguard-backend-gpu
+    env_file:
+      - ./.env
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/storage:/app/storage
+      - ./backend/data:/app/data
+      - ./models:/app/data/models
+    environment:
+      - DATABASE_URL=postgresql+psycopg2://nexguard_user:${POSTGRES_PASSWORD:-NexGuard2024!}@db:5432/nexguard_db
+      - YOLO_DEVICE=cuda
+      - DEBUG=false
+      - STORAGE_DIR=/app/storage
+      - DATA_DIR=/app/data
+      - MODELS_DIR=/app/data/models
+      - PYTHONPATH=/app
     depends_on:
       db:
         condition: service_healthy
@@ -32,6 +98,9 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 60s
+    profiles:
+      - gpu
 
   frontend:
     build: 
@@ -39,33 +108,22 @@ services:
       dockerfile: Dockerfile
     container_name: nexguard-client
     ports:
-      - "3000:80"
+      - "3000:3000"
+    env_file:
+      - ./frontend/nexguard/.env
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NODE_ENV=production
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    profiles:
+      - default
+      - gpu
   
-  db:
-    image: mcr.microsoft.com/mssql/server:2022-latest
-    container_name: nexguard-db
-    restart: unless-stopped
-    environment:
-      SA_PASSWORD: ${SA_PASSWORD}
-      ACCEPT_EULA: "Y"
-      MSSQL_PID: "Express"
-    ports:
-      - "1433:1433"
-    volumes:
-      - db_data:/var/opt/mssql
-    healthcheck:
-      test: ["CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P ${SA_PASSWORD} -Q 'SELECT 1' || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
 volumes:
-  db_data:
+  postgres_data: 
 
 networks:
-  nexguard-network:
+  default:
     driver: bridge
