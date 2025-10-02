@@ -55,7 +55,6 @@ const AuthForm = ({type}: {type: 'Sign-in' | 'Sign-up'}) => {
                 }
 
                 const newUser = await signUp(userData);
-                console.log('User registered successfully:', newUser);
                 
                 setSuccess('Account created successfully! Please sign in.');
                 setTimeout(() => {

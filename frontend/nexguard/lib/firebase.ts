@@ -21,7 +21,7 @@ const firebaseConfig = {
 };
 
 let messaging: Messaging | undefined;
-if(typeof window !== "undefined" && "navigator" in window){
+if (typeof window !== 'undefined' && 'navigator' in window) {
   const app = initializeApp(firebaseConfig);
   messaging = getMessaging(app);
 }
@@ -40,7 +40,29 @@ export const requestForToken = async (): Promise<string | null> => {
     const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY as
       | string
       | undefined;
-    const currentToken = await getToken(messaging, { vapidKey });
+    let serviceWorkerRegistration: ServiceWorkerRegistration | undefined;
+
+    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+      serviceWorkerRegistration =
+        (await navigator.serviceWorker.getRegistration(
+          '/firebase-messaging-sw.js'
+        )) || (await navigator.serviceWorker.ready);
+    }
+
+    const getTokenOptions: {
+      vapidKey?: string;
+      serviceWorkerRegistration?: ServiceWorkerRegistration;
+    } = {};
+
+    if (vapidKey) {
+      getTokenOptions.vapidKey = vapidKey;
+    }
+
+    if (serviceWorkerRegistration) {
+      getTokenOptions.serviceWorkerRegistration = serviceWorkerRegistration;
+    }
+
+    const currentToken = await getToken(messaging, getTokenOptions);
 
     if (currentToken) {
       try {

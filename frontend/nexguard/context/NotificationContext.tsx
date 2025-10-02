@@ -78,7 +78,15 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
       setTokens([localToken]);
     }
 
-    setPermission(Notification.permission);
+    if (typeof Notification !== 'undefined') {
+      setPermission(Notification.permission);
+
+      if (Notification.permission === 'granted') {
+        refreshToken().catch((err) => {
+          console.error('Failed to refresh FCM token on mount', err);
+        });
+      }
+    }
 
     // Listen for foreground messages
     onMessageListener()

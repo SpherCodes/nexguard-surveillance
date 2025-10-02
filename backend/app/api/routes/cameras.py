@@ -76,9 +76,7 @@ async def create_camera(
 ):
     """Create a new camera with validation"""
     try:
-        print(f"Creating camera: {camera_data}")
         camera = camera_service.create_camera(db, camera_data)
-
         if camera.enabled and video_capture:
             config = CameraConfig(
                 camera_id=camera.id,

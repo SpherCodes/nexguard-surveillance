@@ -1,0 +1,177 @@
+/* Custom Video.js player styles for NexGuard */
+
+/* Main player container */
+.video-js {
+  background-color: transparent !important;
+  border-radius: inherit;
+  overflow: hidden;
+}
+
+/* Control bar styling */
+.video-js .vjs-control-bar {
+  background: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.7) 100%) !important;
+  backdrop-filter: blur(4px);
+  border-radius: 0 0 16px 16px;
+  padding: 8px 12px !important;
+  height: auto !important;
+}
+
+/* Play button styling */
+.video-js .vjs-big-play-button {
+  background: rgba(0, 0, 0, 0.8) !important;
+  border: 2px solid rgba(255, 255, 255, 0.9) !important;
+  border-radius: 50% !important;
+  width: 80px !important;
+  height: 80px !important;
+  line-height: 76px !important;
+  margin-left: -40px !important;
+  margin-top: -40px !important;
+  font-size: 28px !important;
+  backdrop-filter: blur(8px);
+  transition: all 0.2s ease !important;
+}
+
+.video-js .vjs-big-play-button:hover {
+  background: rgba(0, 0, 0, 0.9) !important;
+  border-color: white !important;
+  transform: scale(1.05);
+}
+
+.video-js .vjs-big-play-button .vjs-icon-placeholder:before {
+  margin-left: 4px;
+}
+
+/* Progress bar styling */
+.video-js .vjs-progress-control {
+  height: 6px !important;
+  margin: 0 8px !important;
+}
+
+.video-js .vjs-progress-holder {
+  background: rgba(255, 255, 255, 0.2) !important;
+  border-radius: 3px !important;
+  overflow: hidden;
+}
+
+.video-js .vjs-play-progress {
+  background: linear-gradient(90deg, #3b82f6, #1d4ed8) !important;
+  border-radius: 3px !important;
+}
+
+.video-js .vjs-load-progress {
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Control buttons */
+.video-js .vjs-control {
+  color: white !important;
+  transition: opacity 0.2s ease !important;
+}
+
+.video-js .vjs-control:hover {
+  opacity: 0.8 !important;
+}
+
+/* Time display */
+.video-js .vjs-time-control {
+  color: rgba(255, 255, 255, 0.9) !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+}
+
+/* Volume control */
+.video-js .vjs-volume-panel {
+  width: auto !important;
+}
+
+.video-js .vjs-volume-control {
+  background: rgba(0, 0, 0, 0.5) !important;
+  border-radius: 4px !important;
+}
+
+.video-js .vjs-volume-bar {
+  background: rgba(255, 255, 255, 0.2) !important;
+  border-radius: 2px !important;
+}
+
+.video-js .vjs-volume-level {
+  background: linear-gradient(90deg, #3b82f6, #1d4ed8) !important;
+  border-radius: 2px !important;
+}
+
+/* Fullscreen button */
+.video-js .vjs-fullscreen-control {
+  order: 10;
+}
+
+/* Playback rate menu */
+.video-js .vjs-playback-rate .vjs-playback-rate-value {
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  color: rgba(255, 255, 255, 0.9) !important;
+}
+
+/* Menu styling */
+.video-js .vjs-menu {
+  background: rgba(0, 0, 0, 0.9) !important;
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+}
+
+.video-js .vjs-menu-content {
+  background: transparent !important;
+  border-radius: 8px !important;
+  overflow: hidden;
+}
+
+.video-js .vjs-menu li {
+  background: transparent !important;
+  color: white !important;
+  padding: 8px 12px !important;
+  font-size: 13px !important;
+  transition: background-color 0.2s ease !important;
+}
+
+.video-js .vjs-menu li:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+
+.video-js .vjs-menu li.vjs-selected {
+  background: rgba(59, 130, 246, 0.3) !important;
+  color: #60a5fa !important;
+}
+
+/* Loading spinner customization */
+.video-js .vjs-loading-spinner {
+  border-color: rgba(255, 255, 255, 0.3) rgba(255, 255, 255, 0.3) rgba(255, 255, 255, 0.8) rgba(255, 255, 255, 0.8) !important;
+}
+
+/* Error display */
+.video-js .vjs-error-display {
+  background: rgba(0, 0, 0, 0.8) !important;
+  backdrop-filter: blur(4px);
+  border-radius: 16px;
+  margin: 20px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .video-js .vjs-big-play-button {
+    width: 60px !important;
+    height: 60px !important;
+    line-height: 56px !important;
+    margin-left: -30px !important;
+    margin-top: -30px !important;
+    font-size: 20px !important;
+  }
+
+  .video-js .vjs-control-bar {
+    padding: 6px 8px !important;
+  }
+
+  .video-js .vjs-time-control {
+    font-size: 11px !important;
+  }
+}

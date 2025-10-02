@@ -61,15 +61,12 @@ class AlertService:
             user_tokens = db.query(UserDeviceToken).filter(UserDeviceToken.is_active == True).all()
             
             # Send multicast notification
-            invalid_tokens = self.firebase_service.send_fcm_to_topic(
+            self.firebase_service.send_fcm_to_topic(
                 topic=Topics.DETECTION_ALERTS,
                 title=f"Security Alert: Detection on Camera {detection.camera_id}",
                 body=f"Detection triggered with confidence {detection.confidence:.2%} at {detection.created_at.strftime('%Y-%m-%d %H:%M:%S %Z')}.",
             )
-            print(f"Alert sent successfully, Invalid Tokens: {invalid_tokens}")
-            # Mark invalid tokens as inactive
-            if invalid_tokens:
-                self._mark_invalid_tokens(db, invalid_tokens)
+            print("Alert sent successfully")
 
         except Exception as e:
             print(f"Error sending alert: {e}")
@@ -97,6 +94,16 @@ class AlertService:
                 existing_token.updated_at = datetime.datetime.now(timezone.utc)
                 db.commit()
                 logger.info(f"Updated device token for user {user_id}")
+
+                # Ensure the device stays subscribed to detection alerts
+                if self.firebase_service:
+                    try:
+                        self.firebase_service.subscribe_to_topic(existing_token.device_token, Topics.DETECTION_ALERTS)
+                    except Exception as e:
+                        logger.warning(f"Failed to subscribe existing token to detection alerts: {e}")
+                        self._mark_invalid_tokens(db, existing_token.device_token)
+                        raise
+
                 return existing_token
             
             new_token = UserDeviceToken(
@@ -110,6 +117,15 @@ class AlertService:
             db.commit()
             db.refresh(new_token)
             logger.info(f"Registered new device token for user {user_id}")
+
+            if self.firebase_service:
+                try:
+                    self.firebase_service.subscribe_to_topic(new_token.device_token, Topics.DETECTION_ALERTS)
+                except Exception as e:
+                    logger.warning(f"Failed to subscribe new token to detection alerts: {e}")
+                    self._mark_invalid_tokens(db, new_token.device_token)
+                    raise
+
             return new_token
             
         except Exception as e:
@@ -124,14 +140,22 @@ class AlertService:
                 UserDeviceToken.device_token == device_token
             ).first()
             
-            if not token_record.is_active or not token_record:
+            if not token_record:
+                logger.warning(f"Cannot subscribe unknown token {device_token} to topic {topic}")
+                return False
+
+            if not token_record.is_active:
                 logger.warning(f"Cannot subscribe inactive token {device_token} to topic {topic}")
                 return False
-            else:
-                # Subscribe the token to the topic
-                self.firebase_service.subscribe_to_topic(device_token, topic)
-                logger.info(f"Subscribed token {device_token} to topic {topic}")
-                return True
+
+            if not self.firebase_service:
+                logger.warning("Firebase service unavailable, cannot subscribe to topic")
+                return False
+
+            # Subscribe the token to the topic
+            self.firebase_service.subscribe_to_topic(device_token, topic)
+            logger.info(f"Subscribed token {device_token} to topic {topic}")
+            return True
             
         except Exception as e:
             logger.error(f"Error subscribing device token: {e}")
@@ -144,14 +168,22 @@ class AlertService:
                 UserDeviceToken.device_token == device_token
             ).first()
 
-            if not token_record.is_active or not token_record:
+            if not token_record:
+                logger.warning(f"Cannot unsubscribe unknown token {device_token} from topic {topic}")
+                return False
+
+            if not token_record.is_active:
                 logger.warning(f"Cannot unsubscribe inactive token {device_token} from topic {topic}")
                 return False
-            else:
-                # Unsubscribe the token from the topic
-                self.firebase_service.unsubscribe_from_topic(device_token, topic)
-                logger.info(f"Unsubscribed token {device_token} from topic {topic}")
-                return True
+
+            if not self.firebase_service:
+                logger.warning("Firebase service unavailable, cannot unsubscribe from topic")
+                return False
+
+            # Unsubscribe the token from the topic
+            self.firebase_service.unsubscribe_from_topic(device_token, topic)
+            logger.info(f"Unsubscribed token {device_token} from topic {topic}")
+            return True
 
         except Exception as e:
             logger.error(f"Error unsubscribing device token: {e}")
@@ -167,7 +199,9 @@ class AlertService:
                 #update the preference if it exists
                 pref.enabled = update.enabled
                 pref.updated_at = datetime.datetime.now(timezone.utc)
-                if not pref.enabled:
+                if pref.enabled:
+                    self.subscribe_to_topic(db, update.token, update.category)
+                else:
                     # If disabling, unsubscribe from topic
                     self.unsubscribe_from_topic(db, update.token, update.category)
             else:
@@ -176,7 +210,9 @@ class AlertService:
                     category=update.category,
                     enabled=update.enabled
                 )
-                if not pref.enabled:
+                if pref.enabled:
+                    self.subscribe_to_topic(db, update.token, update.category)
+                else:
                     # If disabling, unsubscribe from topic
                     self.unsubscribe_from_topic(db, update.token, update.category)
                 db.add(pref)
