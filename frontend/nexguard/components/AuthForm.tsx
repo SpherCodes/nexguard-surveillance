@@ -54,8 +54,8 @@ const AuthForm = ({type}: {type: 'Sign-in' | 'Sign-up'}) => {
                     email: data.email as string,
                 }
 
-                const newUser = await signUp(userData);
-                
+                await signUp(userData);
+
                 setSuccess('Account created successfully! Please sign in.');
                 setTimeout(() => {
                     router.push('/sign-in');
@@ -78,12 +78,12 @@ const AuthForm = ({type}: {type: 'Sign-in' | 'Sign-up'}) => {
                     setError('Login failed. Please check your credentials.');
                 }
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Authentication failed:', error);
-            
+
             let errorMessage = 'An unexpected error occurred. Please try again.';
-            
-            if (error?.message) {
+
+            if (error instanceof Error && error.message) {
                 errorMessage = error.message;
             } else if (typeof error === 'string') {
                 errorMessage = error;

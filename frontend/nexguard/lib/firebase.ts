@@ -138,28 +138,34 @@ export const toggleNotification = async (enabled: boolean) => {
 };
 
 /**
- * onMessageListener returns a Promise that resolves with the next foreground payload.
- * Also accepts an optional callback that will be invoked for every payload.
+ * Subscribe to foreground FCM messages.
+ * Returns an unsubscribe function for cleanup.
  */
-export const onMessageListener = (
-  callback?: (payload: MessagePayload) => void
-) =>
-  new Promise<MessagePayload | null>((resolve) => {
-    if (!messaging) {
-      resolve(null);
-      return;
-    }
+export const subscribeToForegroundMessages = (
+  callback: (payload: MessagePayload) => void
+): (() => void) => {
+  if (!messaging) {
+    console.warn('Firebase messaging unavailable for foreground listener.');
+    return () => undefined;
+  }
 
-    try {
-      onMessage(messaging, (payload) => {
-        console.log('Message received: ', payload);
-        if (callback) callback(payload);
-        resolve(payload);
-      });
-    } catch (err) {
-      console.warn('onMessage failed:', err);
-      resolve(null);
-    }
-  });
+  try {
+    const unsubscribe = onMessage(messaging, (payload) => {
+      console.log('Message received: ', payload);
+      callback(payload);
+    });
+
+    return () => {
+      try {
+        unsubscribe();
+      } catch (err) {
+        console.warn('Failed to unsubscribe from foreground messages', err);
+      }
+    };
+  } catch (err) {
+    console.warn('Failed to subscribe to foreground messages', err);
+    return () => undefined;
+  }
+};
 
 export { messaging };

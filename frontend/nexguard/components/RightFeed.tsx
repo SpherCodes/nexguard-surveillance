@@ -27,8 +27,10 @@ const RightFeed = () => {
     queryKey: ['detectionEvents', selectedDate.toISOString().split('T')[0]],
     queryFn: () => getDetectionEventsByDay(selectedDate),
     enabled: !!selectedDate,
-    refetchOnWindowFocus: false,
-    staleTime: 1000 * 60 * 5,
+    refetchOnWindowFocus: true,
+    refetchInterval: 5_000,
+    refetchIntervalInBackground: true,
+    staleTime: 1000 * 30,
     gcTime: 1000 * 60 * 10, 
     retry: 2,
   })

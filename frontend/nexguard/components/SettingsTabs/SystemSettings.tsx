@@ -352,23 +352,23 @@ export default SystemSettings;
             title="AI Detection Settings"
             description="Pick the optimal detection profile and tune confidence thresholds for your environment."
             className="shadow-lg sm:shadow-xl"
-            contentClassName="space-y-8"
+            contentClassName="space-y-6 sm:space-y-8"
           >
             <FormField control={form.control} name="model" render={({ field }) => (
-              <FormItem className="space-y-3">
-                <FormLabel className="text-sm font-semibold text-gray-900">Detection Model</FormLabel>
+              <FormItem className="space-y-3 sm:space-y-4">
+                <FormLabel className="text-sm sm:text-base font-semibold text-gray-900 pb-3">Detection Model</FormLabel>
                 <Select onValueChange={field.onChange} value={field.value}>
                   <FormControl>
-                    <SelectTrigger className="h-12 rounded-2xl border border-gray-200/80 bg-white/80 px-4 text-left text-sm font-medium shadow-sm transition-all focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10">
-                      <SelectValue placeholder="Choose a model" />
+                    <SelectTrigger className="h-16 sm:h-14 rounded-2xl border border-gray-200/80 bg-white/80 px-4 text-sm font-medium shadow-sm transition-all focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10 touch-manipulation">
+                      <SelectValue placeholder="Choose a model" className="flex items-center" />
                     </SelectTrigger>
                   </FormControl>
-                  <SelectContent className="max-h-72">
+                  <SelectContent className="max-h-[70vh] sm:max-h-72">
                     {initialData?.available_models?.map((model) => (
-                      <SelectItem key={model.id} value={model.name}>
-                        <div className="flex flex-col gap-3 py-2 text-left">
-                          <div className="flex flex-col gap-1">
-                            <div className="flex flex-wrap items-center gap-2 text-sm">
+                      <SelectItem key={model.id} value={model.name} className="py-3 sm:py-2">
+                        <div className="flex flex-col gap-2 sm:gap-3 py-1 sm:py-2 text-left">
+                          <div className="flex flex-col gap-1.5 sm:gap-1">
+                            <div className="flex flex-wrap items-center gap-2 text-sm sm:text-sm">
                               <span className="font-semibold text-gray-900">{model.name.toUpperCase()}</span>
                               {MODEL_DETAILS[model.name.toLowerCase()] ? (
                                 <Badge variant="outline" className="border-gray-200 bg-white/80 text-[10px] font-semibold uppercase tracking-wide text-gray-600">
@@ -376,7 +376,7 @@ export default SystemSettings;
                                 </Badge>
                               ) : null}
                             </div>
-                            <span className="text-xs text-gray-500 leading-relaxed">
+                            <span className="text-xs sm:text-xs text-gray-500 leading-relaxed">
                               {model.description || MODEL_DETAILS[model.name.toLowerCase()]?.summary || 'AI Detection Model'}
                             </span>
                           </div>
@@ -391,30 +391,23 @@ export default SystemSettings;
                               </Badge>
                             ))}
                           </div>
-                          <span className="text-[11px] text-gray-400 font-mono break-all leading-tight">
+                          <span className="text-[10px] sm:text-[11px] text-gray-400 font-mono break-all leading-tight">
                             {model.path}
                           </span>
                         </div>
                       </SelectItem>
-                    )) || (
-                      <SelectItem value="yolo11n">
-                        <div className="flex flex-col py-1">
-                          <span className="font-semibold">YOLO11N</span>
-                          <span className="text-xs text-gray-500">Default model</span>
-                        </div>
-                      </SelectItem>
-                    )}
+                    ))}
                   </SelectContent>
                 </Select>
-                <FormDescription className="text-xs text-gray-600">Match the model profile to your deployment hardware and scene complexity.</FormDescription>
+                <FormDescription className="text-xs sm:text-xs text-gray-600 leading-relaxed">Match the model profile to your deployment hardware and scene complexity.</FormDescription>
                 {selectedModelDetail ? (
-                  <div className="rounded-3xl bg-gray-50/80 p-6 text-sm text-gray-600 shadow-inner space-y-5">
-                    <div className="flex flex-wrap items-start gap-3">
-                      <div className="min-w-0 flex-1 space-y-1">
-                        <p className="text-base font-semibold text-gray-900 leading-tight">
+                  <div className="rounded-2xl sm:rounded-3xl bg-gray-50/80 p-4 sm:p-6 text-sm text-gray-600 shadow-inner space-y-4 sm:space-y-5">
+                    <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-start gap-3">
+                      <div className="min-w-0 flex-1 space-y-1.5 sm:space-y-1">
+                        <p className="text-base sm:text-base font-semibold text-gray-900 leading-tight">
                           {(selectedModel?.name ?? selectedModelName)?.toUpperCase()}
                         </p>
-                        <p className="text-sm text-gray-600 leading-relaxed">
+                        <p className="text-sm sm:text-sm text-gray-600 leading-relaxed">
                           {selectedModel?.description || selectedModelDetail.summary}
                         </p>
                       </div>
@@ -433,14 +426,14 @@ export default SystemSettings;
                         </Badge>
                       ))}
                     </div>
-                    <div className="grid gap-1.5 text-xs text-gray-600">
+                    <div className="grid gap-1.5 sm:gap-1.5 text-xs text-gray-600">
                       <span className="font-medium text-gray-800">Tech snapshot</span>
-                      <span className="font-mono text-[11px] text-gray-500">
+                      <span className="font-mono text-[11px] sm:text-[11px] text-gray-500 leading-relaxed">
                         {selectedModelDetail.technical}
                       </span>
-                      <span>{selectedModelDetail.tip}</span>
+                      <span className="leading-relaxed">{selectedModelDetail.tip}</span>
                       {selectedModel?.path ? (
-                        <span className="font-mono text-[11px] text-gray-400 truncate">{selectedModel.path}</span>
+                        <span className="font-mono text-[10px] sm:text-[11px] text-gray-400 break-all">{selectedModel.path}</span>
                       ) : null}
                     </div>
                   </div>
@@ -450,46 +443,46 @@ export default SystemSettings;
 
             <FormField control={form.control} name="min_detection_threshold" render={({ field }) => (
               <FormItem className="space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                  <FormLabel className="text-sm font-semibold text-gray-900">Confidence Threshold</FormLabel>
-                  <div className="text-sm font-bold bg-gray-900 text-white px-4 py-2 rounded-xl shadow-sm">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+                  <FormLabel className="text-sm sm:text-base font-semibold text-gray-900">Confidence Threshold</FormLabel>
+                  <div className="text-base sm:text-sm font-bold bg-gray-900 text-white px-4 py-2.5 sm:py-2 rounded-xl shadow-sm self-start sm:self-auto">
                     {confidencePercent}%
                   </div>
                 </div>
                 <FormControl>
-                  <div className="rounded-2xl bg-gray-50/80 p-6">
+                  <div className="rounded-2xl bg-gray-50/80 p-5 sm:p-6 touch-manipulation">
                     <Slider 
                       value={[confidencePercent]} 
                       max={100} 
                       step={1} 
                       onValueChange={(v) => field.onChange((v[0] ?? 0) / 100)}
-                      className="py-3"
+                      className="py-4 sm:py-3"
                     />
-                    <div className="mt-3 flex flex-wrap items-center justify-between gap-y-2 text-[11px] text-gray-500">
+                    <div className="mt-4 sm:mt-3 flex flex-wrap items-center justify-between gap-y-2 text-[11px] sm:text-[11px] text-gray-500">
                       <span className="font-medium">0%</span>
-                      <span className="text-gray-400">Low confidence</span>
-                      <span className="text-gray-400">High confidence</span>
+                      <span className="hidden sm:inline text-gray-400">Low confidence</span>
+                      <span className="hidden sm:inline text-gray-400">High confidence</span>
                       <span className="font-medium">100%</span>
                     </div>
                   </div>
                 </FormControl>
-                <FormDescription className="text-xs text-gray-600">
+                <FormDescription className="text-xs sm:text-xs text-gray-600 leading-relaxed">
                   Balance alert volume against missed detections for your operators.
                 </FormDescription>
                 <Alert className="border-0 bg-white/80 shadow-sm rounded-2xl p-4 sm:p-5">
-                  <Gauge className="text-gray-500" />
-                  <div>
-                    <AlertTitle className="text-gray-900 text-sm font-semibold flex items-center gap-2">
-                      {confidenceInsight.title}
-                      <Badge variant="outline" className="border-gray-200 text-[10px] uppercase text-gray-600">
+                  <Gauge className="text-gray-500 h-5 w-5 sm:h-4 sm:w-4" />
+                  <div className="space-y-2 sm:space-y-1">
+                    <AlertTitle className="text-gray-900 text-sm sm:text-sm font-semibold flex flex-col sm:flex-row sm:items-center gap-2">
+                      <span>{confidenceInsight.title}</span>
+                      <Badge variant="outline" className="border-gray-200 text-[10px] uppercase text-gray-600 self-start sm:self-auto">
                         {confidenceInsight.badge}
                       </Badge>
                     </AlertTitle>
-                    <AlertDescription className="text-xs text-gray-600">
+                    <AlertDescription className="text-xs sm:text-xs text-gray-600 leading-relaxed">
                       <p>{confidenceInsight.summary}</p>
-                      <ul className="list-disc pl-4 space-y-1 mt-2">
+                      <ul className="list-disc pl-4 space-y-1.5 sm:space-y-1 mt-3 sm:mt-2">
                         {confidenceInsight.bulletPoints.map((item) => (
-                          <li key={item}>{item}</li>
+                          <li key={item} className="leading-relaxed">{item}</li>
                         ))}
                       </ul>
                     </AlertDescription>
@@ -499,11 +492,11 @@ export default SystemSettings;
             )} />
           </SectionShell>
 
-          <div className="flex flex-col sm:flex-row justify-end gap-3">
+          <div className="flex flex-col sm:flex-row justify-end gap-3 pb-4 sm:pb-0">
             <Button 
               type="button"
               variant="outline"
-              className="w-full sm:w-auto order-2 sm:order-1 h-12 sm:h-11 rounded-2xl border-gray-300 hover:bg-white"
+              className="w-full sm:w-auto order-2 sm:order-1 h-12 sm:h-11 rounded-2xl border-gray-300 hover:bg-white touch-manipulation"
               onClick={() => form.reset()}
               disabled={!form.formState.isDirty}
             >
@@ -512,7 +505,7 @@ export default SystemSettings;
             <Button 
               type="submit" 
               disabled={!form.formState.isDirty}
-              className="w-full sm:w-auto order-1 sm:order-2 h-12 sm:h-11 rounded-2xl bg-gray-900 text-white px-8 font-semibold shadow-sm transition hover:bg-gray-800 hover:shadow-md"
+              className="w-full sm:w-auto order-1 sm:order-2 h-12 sm:h-11 rounded-2xl bg-gray-900 text-white px-8 font-semibold shadow-sm transition hover:bg-gray-800 hover:shadow-md touch-manipulation"
             >
               {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} 
               Save Changes
