@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Dict, Any, Optional
 
 from ...services.sys_config_service import SysConfigService
+from ...services.cleanup_service import cleanup_service
 from ...schema.sysconfig import SysInferenceConfig
 
 from ...dependencies import DatabaseDep, get_sys_config_service, ensure_inference_engine
@@ -83,3 +84,44 @@ async def update_storage_settings(
         raise HTTPException(
             status_code=500, detail=f"Internal server error: {str(e)}"
         )
+
+
+@router.post("/cleanup/manual")
+async def manual_cleanup(
+    retention_days: Optional[int] = None
+) -> Dict[str, Any]:
+    """
+    Manually trigger a cleanup of old detections and media.
+    
+    Args:
+        retention_days: Optional override for retention period (in days).
+                       If not provided, uses the configured retention setting.
+    
+    Returns:
+        Dictionary with cleanup statistics and status
+    """
+    try:
+        result = await cleanup_service.manual_cleanup(retention_days)
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Cleanup failed: {str(e)}"
+        )
+
+
+@router.get("/cleanup/status")
+async def get_cleanup_status() -> Dict[str, Any]:
+    """
+    Get the current status of the cleanup service.
+    
+    Returns:
+        Dictionary with service status information
+    """
+    return {
+        "is_running": cleanup_service.is_running,
+        "check_interval_seconds": cleanup_service.check_interval,
+        "check_interval_hours": cleanup_service.check_interval / 3600
+    }

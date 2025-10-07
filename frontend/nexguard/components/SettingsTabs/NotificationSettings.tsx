@@ -13,13 +13,13 @@ import { notifications } from '@/lib/services/notification.service'
 const getPreferenceDescription = (key: string): string => {
   switch (key) {
     case 'push_notifications':
-      return 'Receive push notifications on this device'
+      return 'Get alerts on this device even when the app is closed'
     case 'detection_alerts':
-      return 'Get notified when detections occur'
+      return 'Notify me when cameras detect something'
     case 'system_announcements':
-      return 'Receive system-wide announcements'
+      return 'Important system updates and maintenance notices'
     case 'account_updates':
-      return 'Get notified about account changes'
+      return 'Changes to your account settings or permissions'
     default:
       return ''
   }
@@ -121,21 +121,21 @@ const NotificationSettings: React.FC = () => {
               <div className="p-2 bg-white/15 backdrop-blur-sm rounded-xl">
                 <Bell className="h-5 w-5 text-white" />
               </div>
-              Push Notification Status
+              Push Notifications
             </div>
             <Badge variant={permissionStatus.variant} className={`text-xs px-3 py-1.5 font-medium ${permissionStatus.variant==='default' ? 'bg-white text-gray-900' : ''}`}>
               {permissionStatus.text}
             </Badge>
           </div>
-          <p className="text-gray-300 text-sm mt-2">Manage your push notification settings and devices</p>
+          <p className="text-gray-300 text-sm mt-2">Control how you receive alerts on this device</p>
         </div>
         <div className="p-4 sm:p-6 space-y-4">
           <div className="grid gap-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-gray-50 rounded-xl">
               <div className="space-y-1 flex-1">
-                <Label className="text-sm font-semibold text-gray-900">Browser Permissions</Label>
+                <Label className="text-sm font-semibold text-gray-900">Browser Permission</Label>
                 <p className="text-xs sm:text-sm text-gray-600">
-                  Permission status for this browser
+                  Whether your browser allows notifications
                 </p>
               </div>
               <Badge variant={permissionStatus.variant} className={`${permissionStatus.color} text-xs px-3 py-1.5 font-medium shrink-0`}>
@@ -145,9 +145,9 @@ const NotificationSettings: React.FC = () => {
 
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-gray-50 rounded-xl">
               <div className="space-y-1 flex-1">
-                <Label className="text-sm font-semibold text-gray-900">Device Registration</Label>
+                <Label className="text-sm font-semibold text-gray-900">This Device</Label>
                 <p className="text-xs sm:text-sm text-gray-600">
-                  {currentDeviceToken ? 'This device is registered for notifications' : 'Device not registered for notifications'}
+                  {currentDeviceToken ? 'Ready to receive notifications' : 'Not set up for notifications yet'}
                 </p>
               </div>
               <Badge variant={currentDeviceToken ? 'default' : 'secondary'} className="text-xs px-3 py-1.5 font-medium shrink-0">
@@ -163,7 +163,7 @@ const NotificationSettings: React.FC = () => {
                 className="w-full sm:w-auto bg-gray-900 hover:bg-gray-800 text-white flex items-center justify-center gap-2 h-11 sm:h-10 font-semibold rounded-xl"
               >
                 <Bell className="h-4 w-4" />
-                Enable Notifications
+                Turn On Notifications
               </Button>
             ) : (
               <Button 
@@ -172,7 +172,7 @@ const NotificationSettings: React.FC = () => {
                 className="w-full sm:w-auto flex items-center justify-center gap-2 h-11 sm:h-10 font-semibold rounded-xl"
               >
                 <BellOff className="h-4 w-4" />
-                Disable Notifications
+                Turn Off Notifications
               </Button>
             )}
           </div>
@@ -186,9 +186,9 @@ const NotificationSettings: React.FC = () => {
             <div className="p-2 bg-white/15 backdrop-blur-sm rounded-xl">
               <Bell className="h-5 w-5 text-white" />
             </div>
-            Notification Preferences
+            Notification Types
           </div>
-          <p className="text-gray-300 text-sm mt-2">Choose what types of notifications you want to receive</p>
+          <p className="text-gray-300 text-sm mt-2">Choose which alerts you want to receive</p>
         </div>
         <div className="p-4 sm:p-6">
           {loading ? (
