@@ -17,9 +17,9 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 import { ReactNode, useEffect, useState } from 'react';
 import { systemSettingsNav } from '@/constants';
-import { Loader2, Save, Users, Trash2, Brain, Database, Shield, Gauge } from 'lucide-react';
+import { Loader2, Save, Users, Trash2, Brain, Database, Shield, Gauge, Trash } from 'lucide-react';
 import { InfrenceFormProps, StorageFormProps} from '@/Types';
-import { getInferenceSettings, getSystemStorageSettings, updateInferenceSettings, updateStorageSettings} from '@/lib/actions/api.actions';
+import { getInferenceSettings, getSystemStorageSettings, updateInferenceSettings, updateStorageSettings, manualCleanup} from '@/lib/actions/api.actions';
 import { getUsers, getCurrentUser, updateUserStatus, deleteUser } from '@/lib/actions/user.actions';
 import type { User } from '@/Types';
 
@@ -33,39 +33,39 @@ type ModelDetail = {
 
 const MODEL_DETAILS: Record<string, ModelDetail> = {
   yolo11n: {
-    label: 'Edge Ready',
-    summary: 'Ultra-fast profile designed for CPU-only gateways and pilots.',
-    highlights: ['Fastest latency', 'Minimal VRAM (~1 GB)', 'Ideal for 1-2 streams'],
-    technical: '≈7.7M parameters · ~7 MB model file',
-    tip: 'Choose this when responsiveness matters more than accuracy.',
+    label: 'Lightweight',
+    summary: 'Best for systems with limited resources or when testing the setup.',
+    highlights: ['Fastest processing', 'Low memory usage', 'Works on basic hardware'],
+    technical: 'Small model size: ~7 MB',
+    tip: 'Perfect for getting started or running on low-power devices.',
   },
   yolo11s: {
-    label: 'Balanced',
-    summary: 'Balanced accuracy and speed—great default for most workloads.',
-    highlights: ['Good accuracy', 'Runs on modest GPUs', 'Handles 3-5 HD streams'],
-    technical: '≈22M parameters · ~24 MB model file',
-    tip: 'Start here for production environments and tune as needed.',
+    label: 'Recommended',
+    summary: 'Great balance between accuracy and speed for most surveillance needs.',
+    highlights: ['Good detection accuracy', 'Works on standard computers', 'Handles multiple cameras'],
+    technical: 'Medium model size: ~24 MB',
+    tip: 'This is the best choice for most installations.',
   },
   yolo11m: {
-    label: 'High Fidelity',
-    summary: 'Improved precision with moderate compute requirements.',
-    highlights: ['Sharper detections', 'Needs mid-range GPU', 'Supports moderate concurrency'],
-    technical: '≈49M parameters · ~50 MB model file',
-    tip: 'Use when you need better accuracy but can spare GPU headroom.',
+    label: 'High Accuracy',
+    summary: 'Better detection quality for important areas or distant objects.',
+    highlights: ['More accurate detections', 'Better for far-away objects', 'Needs decent graphics card'],
+    technical: 'Larger model size: ~50 MB',
+    tip: 'Use this when you need to detect objects more reliably.',
   },
   yolo11l: {
-    label: 'Accuracy Focused',
-    summary: 'Higher capacity model for complex scenes and long-range cameras.',
-    highlights: ['High confidence outputs', 'Requires 8GB+ VRAM', 'Best for critical zones'],
-    technical: '≈77M parameters · ~79 MB model file',
-    tip: 'Deploy on GPU servers where false negatives are unacceptable.',
+    label: 'Very High Accuracy',
+    summary: 'Premium detection quality for critical surveillance zones.',
+    highlights: ['Excellent detection quality', 'Best for critical areas', 'Requires powerful graphics card'],
+    technical: 'Large model size: ~79 MB',
+    tip: 'Choose this for your most important camera feeds.',
   },
   yolo11x: {
-    label: 'Max Precision',
-    summary: 'Largest YOLOv11 variant delivering the strongest accuracy.',
-    highlights: ['Deepest feature extraction', 'Needs high-end GPU', 'Best for analytics'],
-    technical: '≈140M parameters · ~130 MB model file',
-    tip: 'Reserve for analytic review or high-value assets with ample compute.',
+    label: 'Maximum Accuracy',
+    summary: 'Highest quality detection for mission-critical applications.',
+    highlights: ['Best possible accuracy', 'Ideal for forensic review', 'Requires high-end hardware'],
+    technical: 'Largest model size: ~130 MB',
+    tip: 'Only use if you have powerful hardware and need the absolute best quality.',
   },
 };
 
@@ -79,38 +79,38 @@ type ConfidenceInsight = {
 const getConfidenceInsight = (value: number): ConfidenceInsight => {
   if (value <= 0.35) {
     return {
-      title: 'High Sensitivity (more alerts)',
-      badge: 'Aggressive detection',
-      summary: 'Prioritises capturing every possible event. Expect more false positives.',
+      title: 'Very Sensitive (more alerts)',
+      badge: 'High sensitivity',
+      summary: 'Catches almost every event, but you will see more false alarms.',
       bulletPoints: [
-        'Recommended during setup, tuning, or for low-risk monitoring.',
-        'Review alerts frequently to label and fine-tune zones.',
-        'Ideal when missing an event is more costly than false alarms.',
+        'Good for testing your setup or during training.',
+        'Review alerts regularly to adjust zone settings.',
+        'Use when it\'s more important to catch everything than to avoid false alarms.',
       ],
     };
   }
 
   if (value <= 0.7) {
     return {
-      title: 'Balanced (recommended)',
-      badge: 'Everyday operations',
-      summary: 'Balanced trade-off between sensitivity and precision for most sites.',
+      title: 'Recommended Balance',
+      badge: 'Best for most sites',
+      summary: 'Good balance between catching real events and avoiding false alarms.',
       bulletPoints: [
-        'Good starting point for production deployments.',
-        'Pairs well with alert review workflows and escalation rules.',
-        'Maintains healthy alert volumes without overwhelming operators.',
+        'This is the best starting point for everyday use.',
+        'Works well with normal alert review processes.',
+        'Keeps alert volume manageable without missing important events.',
       ],
     };
   }
 
   return {
-    title: 'High Precision (fewer alerts)',
-    badge: 'Strict filtering',
-    summary: 'Focuses on the most confident detections to reduce noise.',
+    title: 'Very Strict (fewer alerts)',
+    badge: 'Fewer false alarms',
+    summary: 'Only triggers alerts for very clear detections, may miss some events.',
     bulletPoints: [
-      'Use for sensitive alerts where false alarms are disruptive.',
-      'May miss smaller or partial detections—validate with real footage.',
-      'Best for stable lighting and predictable camera views.',
+      'Use when false alarms are disruptive to your operations.',
+      'Might miss smaller objects or unclear detections—test with your cameras.',
+      'Works best with good lighting and clear camera views.',
     ],
   };
 };
@@ -276,10 +276,10 @@ const SystemSettings = () => {
   return (
     <div className="flex flex-col h-full max-w-6xl mx-auto">
       {/* Mobile-Friendly Header & Navigation */}
-  <div className="space-y-6 mb-6">
+      <div className="space-y-6 mb-6">
         <div className="space-y-2">
-          <h2 className="text-xl md:text-2xl font-bold text-gray-900">System Configuration</h2>
-          <p className="text-gray-600 text-sm">Manage core system settings and user access</p>
+          <h2 className="text-xl md:text-2xl font-bold text-gray-900">System Settings</h2>
+          <p className="text-gray-600 text-sm">Configure detection, storage, and user permissions</p>
         </div>
         
         {/* Horizontal Navigation - Clean Design */}
@@ -295,16 +295,25 @@ const SystemSettings = () => {
                   ? 'bg-gray-900 text-white border-gray-900 shadow-lg'
                   : 'bg-white/70 text-gray-700 border-gray-200 hover:bg-white hover:border-gray-300 hover:shadow-sm'
               )}
+              title={item.description}
             >
               <div className={cn(
-                'flex h-9 w-9 items-center justify-center rounded-xl transition-all duration-200',
+                'flex h-9 w-9 items-center justify-center rounded-xl transition-all duration-200 shrink-0',
                 activeSection === item.id
                   ? 'bg-white/15 text-white'
                   : 'bg-white text-gray-700 shadow-sm'
               )}>
                 <item.icon className="h-4 w-4" />
               </div>
-              <span className="truncate">{item.label}</span>
+              <div className="flex flex-col min-w-0 flex-1">
+                <span className="truncate">{item.label}</span>
+                <span className={cn(
+                  "text-[11px] font-normal truncate sm:hidden",
+                  activeSection === item.id ? 'text-gray-300' : 'text-gray-500'
+                )}>
+                  {item.description}
+                </span>
+              </div>
             </button>
           ))}
         </nav>
@@ -349,14 +358,14 @@ export default SystemSettings;
         <form onSubmit={form.handleSubmit(data => onSave(data))} className="space-y-6 sm:space-y-8">
           <SectionShell
             icon={<Brain className="h-5 w-5" />}
-            title="AI Detection Settings"
-            description="Pick the optimal detection profile and tune confidence thresholds for your environment."
+            title="AI Detection Model"
+            description="Choose the detection quality that matches your hardware. Higher quality requires more powerful computers."
             className="shadow-lg sm:shadow-xl"
             contentClassName="space-y-6 sm:space-y-8"
           >
             <FormField control={form.control} name="model" render={({ field }) => (
               <FormItem className="space-y-3 sm:space-y-4">
-                <FormLabel className="text-sm sm:text-base font-semibold text-gray-900 pb-3">Detection Model</FormLabel>
+                <FormLabel className="text-sm sm:text-base font-semibold text-gray-900 pb-3">Choose Detection Quality</FormLabel>
                 <Select onValueChange={field.onChange} value={field.value}>
                   <FormControl>
                     <SelectTrigger className="h-16 sm:h-14 rounded-2xl border border-gray-200/80 bg-white/80 px-4 text-sm font-medium shadow-sm transition-all focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10 touch-manipulation">
@@ -399,7 +408,7 @@ export default SystemSettings;
                     ))}
                   </SelectContent>
                 </Select>
-                <FormDescription className="text-xs sm:text-xs text-gray-600 leading-relaxed">Match the model profile to your deployment hardware and scene complexity.</FormDescription>
+                <FormDescription className="text-xs sm:text-xs text-gray-600 leading-relaxed">Pick a quality level that works with your computer&apos;s capabilities.</FormDescription>
                 {selectedModelDetail ? (
                   <div className="rounded-2xl sm:rounded-3xl bg-gray-50/80 p-4 sm:p-6 text-sm text-gray-600 shadow-inner space-y-4 sm:space-y-5">
                     <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-start gap-3">
@@ -427,7 +436,7 @@ export default SystemSettings;
                       ))}
                     </div>
                     <div className="grid gap-1.5 sm:gap-1.5 text-xs text-gray-600">
-                      <span className="font-medium text-gray-800">Tech snapshot</span>
+                      <span className="font-medium text-gray-800">What to expect</span>
                       <span className="font-mono text-[11px] sm:text-[11px] text-gray-500 leading-relaxed">
                         {selectedModelDetail.technical}
                       </span>
@@ -444,7 +453,7 @@ export default SystemSettings;
             <FormField control={form.control} name="min_detection_threshold" render={({ field }) => (
               <FormItem className="space-y-4">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-                  <FormLabel className="text-sm sm:text-base font-semibold text-gray-900">Confidence Threshold</FormLabel>
+                  <FormLabel className="text-sm sm:text-base font-semibold text-gray-900">Alert Sensitivity</FormLabel>
                   <div className="text-base sm:text-sm font-bold bg-gray-900 text-white px-4 py-2.5 sm:py-2 rounded-xl shadow-sm self-start sm:self-auto">
                     {confidencePercent}%
                   </div>
@@ -467,7 +476,7 @@ export default SystemSettings;
                   </div>
                 </FormControl>
                 <FormDescription className="text-xs sm:text-xs text-gray-600 leading-relaxed">
-                  Balance alert volume against missed detections for your operators.
+                  Higher values mean fewer alerts but you might miss some events. Lower values catch more but may include false alarms.
                 </FormDescription>
                 <Alert className="border-0 bg-white/80 shadow-sm rounded-2xl p-4 sm:p-5">
                   <Gauge className="text-gray-500 h-5 w-5 sm:h-4 sm:w-4" />
@@ -500,7 +509,7 @@ export default SystemSettings;
               onClick={() => form.reset()}
               disabled={!form.formState.isDirty}
             >
-              Reset Changes
+              Revert Changes
             </Button>
             <Button 
               type="submit" 
@@ -527,13 +536,35 @@ const StorageForm = ({
 }: StorageFormProps
 ) => {
   const form = useForm<StorageFormData>({ resolver: zodResolver(storageSchema), defaultValues: initialData });
+  const [isCleaningUp, setIsCleaningUp] = useState(false);
+  
+  const handleManualCleanup = async () => {
+    if (!window.confirm('This will permanently delete all videos and detections older than the retention period. Continue?')) {
+      return;
+    }
+    
+    setIsCleaningUp(true);
+    try {
+      const result = await manualCleanup();
+      notifications.success('Cleanup Complete', {
+        description: `Removed ${result.detections_removed} detections and ${result.files_deleted} files`
+      });
+    } catch (error) {
+      notifications.error('Cleanup Failed', {
+        description: error instanceof Error ? error.message : 'An error occurred during cleanup'
+      });
+    } finally {
+      setIsCleaningUp(false);
+    }
+  };
+  
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(data => onSave(data))} className="space-y-6 sm:space-y-8">
         <SectionShell
           icon={<Database className="h-5 w-5" />}
-          title="Storage Management"
-          description="Configure your recording destination and retention cadence."
+          title="Recording Storage"
+          description="Choose where videos are saved and how long to keep them."
         >
           <FormField control={form.control} name="storageType" render={({ field }) => (
             <FormItem className="space-y-3">
@@ -559,14 +590,14 @@ const StorageForm = ({
                   </SelectItem>
                 </SelectContent>
               </Select>
-              <FormDescription className="text-xs text-gray-600">Pick the storage target that aligns with your infrastructure.</FormDescription>
+              <FormDescription className="text-xs text-gray-600">Choose where to save your video recordings.</FormDescription>
             </FormItem>
           )} />
 
           <FormField control={form.control} name="retentionDays" render={({ field }) => (
             <FormItem className="space-y-3">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <FormLabel className="text-sm font-semibold text-gray-900">Retention Period</FormLabel>
+                <FormLabel className="text-sm font-semibold text-gray-900">How Long to Keep Videos</FormLabel>
                 <div className="text-sm font-bold bg-gray-900 text-white px-4 py-2 rounded-xl shadow-sm">
                   {field.value} days
                 </div>
@@ -581,26 +612,57 @@ const StorageForm = ({
                   <SelectItem value="7">
                     <div className="flex items-center justify-between w-full py-1">
                       <span className="font-semibold">7 Days</span>
-                      <span className="text-xs text-gray-500 ml-3">Short-term review</span>
+                      <span className="text-xs text-gray-500 ml-3">One week</span>
                     </div>
                   </SelectItem>
                   <SelectItem value="14">
                     <div className="flex items-center justify-between w-full py-1">
                       <span className="font-semibold">14 Days</span>
-                      <span className="text-xs text-gray-500 ml-3">Balanced coverage</span>
+                      <span className="text-xs text-gray-500 ml-3">Two weeks</span>
                     </div>
                   </SelectItem>
                   <SelectItem value="30">
                     <div className="flex items-center justify-between w-full py-1">
                       <span className="font-semibold">30 Days</span>
-                      <span className="text-xs text-gray-500 ml-3">Extended retention</span>
+                      <span className="text-xs text-gray-500 ml-3">One month</span>
                     </div>
                   </SelectItem>
                 </SelectContent>
               </Select>
-              <FormDescription className="text-xs text-gray-600">Older footage is automatically purged once it exceeds this horizon.</FormDescription>
+              <FormDescription className="text-xs text-gray-600">Older videos are automatically deleted after this time period.</FormDescription>
             </FormItem>
           )} />
+          
+          {/* Manual Cleanup Section */}
+          <div className="mt-6 p-4 bg-gray-50 rounded-2xl border border-gray-200">
+            <div className="space-y-3">
+              <div>
+                <h4 className="text-sm font-semibold text-gray-900">Clean Up Old Data Now</h4>
+                <p className="text-xs text-gray-600 mt-1">
+                  Manually remove videos and detections older than {form.watch('retentionDays') || initialData.retentionDays} days
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleManualCleanup}
+                disabled={isCleaningUp}
+                className="w-full sm:w-auto bg-white hover:bg-gray-50 border-gray-300 text-gray-700"
+              >
+                {isCleaningUp ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Cleaning Up...
+                  </>
+                ) : (
+                  <>
+                    <Trash className="mr-2 h-4 w-4" />
+                    Clean Up Now
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
         </SectionShell>
 
         <div className="flex flex-col sm:flex-row justify-end gap-3">
@@ -611,7 +673,7 @@ const StorageForm = ({
             onClick={() => form.reset()}
             disabled={!form.formState.isDirty}
           >
-            Reset Changes
+            Revert Changes
           </Button>
           <Button 
             type="submit" 
@@ -653,10 +715,10 @@ const AccessControlForm = ({ users, currentUser }: AccessControlFormProps) => {
   const { mutate: mutateDelete, isPending: isDeletingUser } = useMutation({
     mutationFn: (userId: number) => deleteUser(userId),
     onSuccess: () => {
-      notifications.userAction('User deleted successfully');
+      notifications.userAction('User removed successfully');
       queryClient.invalidateQueries({ queryKey: ['adminUsers'] });
     },
-    onError: (e: Error) => notifications.error('Failed to delete user', {
+    onError: (e: Error) => notifications.error('Failed to remove user', {
       description: e.message || 'Please try again.'
     }),
   });
@@ -664,9 +726,9 @@ const AccessControlForm = ({ users, currentUser }: AccessControlFormProps) => {
   const formatRole = (role?: User['role']) => {
     switch (role) {
       case 'super_admin':
-        return 'Super Admin';
+        return 'System Administrator';
       case 'admin':
-        return 'Admin';
+        return 'Administrator';
       case 'operator':
         return 'Operator';
       default:
@@ -717,8 +779,8 @@ const AccessControlForm = ({ users, currentUser }: AccessControlFormProps) => {
   return (
     <SectionShell
       icon={<Shield className="h-5 w-5" />}
-      title="User Access Control"
-      description="Manage operator access, approval status, and escalation visibility."
+      title="User Management"
+      description="Control who can access the system and set their permission levels."
       headerAside={legend}
     >
       <div className="flex flex-col sm:flex-row gap-3">
@@ -857,18 +919,27 @@ const AccessControlForm = ({ users, currentUser }: AccessControlFormProps) => {
                     )) && (
                       <Button
                         variant="outline"
-                        size="icon"
-                        className="h-10 w-10 rounded-2xl border-red-200 text-red-600 transition hover:bg-red-50 hover:border-red-300"
-                        title="Delete user"
+                        size="sm"
+                        className="h-10 px-4 rounded-2xl border-red-200 text-red-600 transition hover:bg-red-50 hover:border-red-300 font-medium"
                         onClick={() => {
                           if (!user.id) return;
-                          if (window.confirm(`Delete user ${user.username}? This cannot be undone.`)) {
+                          if (window.confirm(`Remove ${user.username} from the system?\n\nThis will permanently delete their account and cannot be undone.`)) {
                             mutateDelete(user.id);
                           }
                         }}
                         disabled={isDeletingUser}
                       >
-                        {isDeletingUser ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                        {isDeletingUser ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Removing...
+                          </>
+                        ) : (
+                          <>
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Remove User
+                          </>
+                        )}
                       </Button>
                     )}
                   </div>

@@ -3,13 +3,10 @@
 import { SidebarLinks } from '@/constants'
 import Image from 'next/image'
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import React, { useState } from 'react'
 import { cn } from '@/lib/utils'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { notifications } from '@/lib/services/notification.service'
-import { getCurrentUser, signOut as signOutAction } from '@/lib/actions/user.actions'
-import type { User } from '@/Types'
+import { useAuth } from '@/context/AuthContext'
 
 import {
   Tooltip,
@@ -22,27 +19,8 @@ import SidebarFooter from '@/components/ui/SidebarFooter'
 const Sidebar = () => {
   const [isExpanded, setIsExpanded] = useState(false)
   const pathname = usePathname()
-  const router = useRouter()
-  const queryClient = useQueryClient()
+  const { user, signOut } = useAuth()
 
-  // Current user
-  const { data: currentUser } = useQuery<User | null>({
-    queryKey: ['currentUser'],
-    queryFn: getCurrentUser,
-  })
-
-  // Logout handler
-  const { mutate: doSignOut, isPending: signingOut } = useMutation({
-    mutationFn: () => signOutAction(),
-    onSuccess: () => {
-      queryClient.clear()
-      notifications.success('Signed out successfully')
-      router.push('/sign-in')
-    },
-    onError: () => notifications.error('Failed to sign out', {
-      description: 'Please try again.'
-    }),
-  })
   return (
     <TooltipProvider delayDuration={0}>
       <aside 
@@ -148,9 +126,9 @@ const Sidebar = () => {
 
         {/* Footer */}
         <SidebarFooter 
-          currentUser={currentUser ?? undefined} 
-          onSignOut={() => doSignOut()} 
-          signingOut={signingOut}
+          currentUser={user ?? undefined} 
+          onSignOut={signOut} 
+          signingOut={false}
           isExpanded={isExpanded}
         />
 

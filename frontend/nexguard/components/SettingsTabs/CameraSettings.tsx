@@ -287,15 +287,15 @@ function CameraSettings() {
               ) : (
                 <div className="flex flex-col items-center justify-center h-48 lg:h-64 text-center p-4 lg:p-6 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200">
                   <CameraIcon className="h-10 w-10 lg:h-12 lg:w-12 text-gray-300 mb-3 lg:mb-4" />
-                  <h3 className="text-sm font-medium text-gray-600 mb-2">No cameras configured</h3>
-                  <p className="text-xs text-gray-500 mb-4">Get started by adding your first camera</p>
+                  <h3 className="text-sm font-medium text-gray-600 mb-2">No cameras set up yet</h3>
+                  <p className="text-xs text-gray-500 mb-4">Add your first camera to start monitoring</p>
                   <Button 
                     onClick={handleAddClick}
                     size="sm"
                     className="bg-blue-600 hover:bg-blue-700 text-white"
                   >
                     <Plus className="mr-1 h-3 w-3" />
-                    Add Camera
+                    Add Your First Camera
                   </Button>
                 </div>
               )}
@@ -407,22 +407,22 @@ function CameraSettings() {
         </div>
       </div>
 
-      {/* --- Delete Confirmation Dialog --- */}
+      {/* --- Remove Camera Confirmation Dialog --- */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent className="sm:max-w-md">
           <AlertDialogHeader className="text-center sm:text-left">
             <AlertDialogTitle className="text-xl font-semibold text-gray-900">
-              Delete Camera
+              Remove Camera?
             </AlertDialogTitle>
             <AlertDialogDescription className="text-gray-600 mt-2">
-              Are you sure you want to delete <span className="font-semibold text-gray-900">&quot;{cameraToDelete?.name}&quot;</span>? 
+              Are you sure you want to remove <span className="font-semibold text-gray-900">&quot;{cameraToDelete?.name}&quot;</span>? 
               <br />
-              <span className="text-sm text-red-600 mt-1 block">This action cannot be undone.</span>
+              <span className="text-sm text-red-600 mt-1 block">This will permanently delete all recordings and settings for this camera.</span>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex gap-3 sm:gap-2">
             <AlertDialogCancel className="flex-1 sm:flex-none">
-              Cancel
+              Keep Camera
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={() => cameraToDelete && deleteCameraMutate(cameraToDelete.cameraId)}
@@ -430,9 +430,12 @@ function CameraSettings() {
               disabled={isDeleting}
             >
               {isDeleting ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Removing...
+                </>
               ) : (
-                "Delete Camera"
+                "Remove Camera"
               )}
             </AlertDialogAction>
           </AlertDialogFooter>

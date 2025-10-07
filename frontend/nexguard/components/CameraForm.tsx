@@ -137,40 +137,64 @@ const CameraForm = ({ initialData, onSubmit, onDelete , onCreateZone, zones = []
           </div>
         </div>
 
-        {/* --- Card 3: Danger Zone (Only in Edit Mode) --- */}
+        {/* --- Card 3: Remove Camera Section (Only in Edit Mode) --- */}
         {isEditMode && onDelete && (
-          <div className="bg-red-50 rounded-2xl shadow-sm ring-1 ring-red-200 overflow-hidden">
-            <div className="bg-gradient-to-r from-red-600 to-red-700 p-6">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-white/15 backdrop-blur-sm rounded-xl">
-                  <Trash2 className="h-5 w-5 text-white" />
+          <div className="bg-gradient-to-br from-gray-50 to-gray-100/50 rounded-2xl shadow-sm ring-1 ring-gray-200 overflow-hidden">
+            <div className="p-6 space-y-4">
+              <div className="flex items-start gap-4">
+                <div className="flex-shrink-0">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-gray-400 to-gray-500 shadow-md">
+                    <Trash2 className="h-5 w-5 text-white" />
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-white">Danger Zone</h3>
-                  <p className="text-red-100 text-sm mt-1">Permanent actions that cannot be undone</p>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-base font-semibold text-gray-900 mb-1">
+                    Remove Camera
+                  </h3>
+                  <p className="text-sm text-gray-600 leading-relaxed">
+                    Removing this camera will permanently delete all associated recordings, detection zones, and configuration settings.
+                  </p>
                 </div>
               </div>
-            </div>
-            <div className="p-6 flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="font-semibold text-red-700">Delete this camera</p>
-                <p className="text-sm text-red-600 mt-1">This action is permanent and cannot be undone.</p>
+
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                <div className="flex gap-3">
+                  <div className="flex-shrink-0">
+                    <svg className="h-5 w-5 text-amber-600 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-amber-900">
+                      This action cannot be undone
+                    </p>
+                    <p className="text-xs text-amber-700 mt-1">
+                      Make sure to back up any important footage before proceeding.
+                    </p>
+                  </div>
+                </div>
               </div>
-              <Button 
-                type="button" 
-                variant="destructive" 
-                onClick={() => onDelete()} 
-                disabled={loading} 
-                className="w-full sm:w-auto bg-red-600 hover:bg-red-700 focus:ring-red-500"
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete
-              </Button>
+
+              <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                <Button 
+                  type="button" 
+                  variant="outline"
+                  onClick={() => onDelete()} 
+                  disabled={loading} 
+                  className="w-full sm:w-auto h-11 rounded-xl border-2 border-gray-300 hover:border-gray-400 hover:bg-gray-50 text-gray-700 font-medium transition-all duration-200"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Remove Camera
+                </Button>
+                <span className="text-xs text-gray-500 flex items-center px-3">
+                  You&apos;ll be asked to confirm this action
+                </span>
+              </div>
             </div>
           </div>
         )}
         
-        {/* --- Static Action Footer (Only shows when there are changes) --- */}
+        {/* --- Action Footer (Only shows when there are changes) --- */}
         {form.formState.isDirty && (
           <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 p-6">
             <div className="flex items-center justify-end gap-3">
@@ -181,7 +205,7 @@ const CameraForm = ({ initialData, onSubmit, onDelete , onCreateZone, zones = []
                 className="hover:bg-gray-100 hover:text-gray-900"
               >
                 <X className="mr-2 h-4 w-4" />
-                Cancel
+                Discard Changes
               </Button>
               <Button 
                 type="submit" 
@@ -189,7 +213,7 @@ const CameraForm = ({ initialData, onSubmit, onDelete , onCreateZone, zones = []
                 className="bg-gray-900 hover:bg-gray-800 focus:ring-gray-900/20"
               >
                 {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                {isEditMode ? 'Save Changes' : 'Create Camera'}
+                {isEditMode ? 'Save Changes' : 'Add Camera'}
               </Button>
             </div>
           </div>

@@ -336,3 +336,38 @@ export async function updateStorageSettings(
     throw error;
   }
 }
+
+export async function manualCleanup(retentionDays?: number): Promise<{
+  success: boolean;
+  message: string;
+  cutoff_date?: string;
+  detections_removed: number;
+  media_removed: number;
+  files_deleted: number;
+}> {
+  try {
+    const url = retentionDays
+      ? `${API_BASE_URL}/api/v1/system/cleanup/manual?retention_days=${retentionDays}`
+      : `${API_BASE_URL}/api/v1/system/cleanup/manual`;
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(
+        errorData.detail ||
+          `Cleanup failed: ${response.status} ${response.statusText}`
+      );
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error running manual cleanup:', error);
+    throw error;
+  }
+}
