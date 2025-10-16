@@ -57,16 +57,39 @@ class AlertService:
                 data={"detection_id": detection.id}
             )
 
-            # Query all active tokens
-            user_tokens = db.query(UserDeviceToken).filter(UserDeviceToken.is_active == True).all()
+            # Query ONLY active tokens from database
+            user_tokens = db.query(UserDeviceToken).filter(
+                UserDeviceToken.is_active == True
+            ).all()
             
-            # Send multicast notification
-            self.firebase_service.send_fcm_to_topic(
-                topic=Topics.DETECTION_ALERTS,
+            if not user_tokens:
+                print("No active device tokens found in database - no alerts will be sent")
+                logger.info("No active device tokens found - skipping alert notification")
+                return
+            
+            # Extract token strings from database records
+            active_token_strings = [token.device_token for token in user_tokens]
+            print(f"Found {len(active_token_strings)} active tokens in database")
+            logger.info(f"Sending alerts to {len(active_token_strings)} active tokens")
+            
+            # Send multicast notification ONLY to tokens in database
+            failed_tokens = self.firebase_service.send_multicast_notification(
+                tokens=active_token_strings,
                 title=f"Security Alert: Detection on Camera {detection.camera_id}",
                 body=f"Detection triggered with confidence {detection.confidence:.2%} at {detection.created_at.strftime('%Y-%m-%d %H:%M:%S %Z')}.",
+                data={
+                    "notification_type": "alert",
+                    "detection_id": str(detection.id),
+                    "camera_id": str(detection.camera_id)
+                }
             )
-            print("Alert sent successfully")
+            
+            # Mark failed tokens as inactive
+            if failed_tokens:
+                print(f"Marking {len(failed_tokens)} failed tokens as inactive")
+                self._mark_invalid_tokens(db, failed_tokens)
+            
+            print(f"Alert sent successfully to {len(active_token_strings) - len(failed_tokens)} devices")
 
         except Exception as e:
             print(f"Error sending alert: {e}")

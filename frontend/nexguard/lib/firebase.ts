@@ -4,9 +4,14 @@ import {
   getToken,
   MessagePayload,
   onMessage,
-  Messaging
+  Messaging,
+  deleteToken
 } from 'firebase/messaging';
-import { registerDeviceToken } from './actions/notification.actions';
+import {
+  registerDeviceToken,
+  unregisterDeviceToken
+} from './actions/notification.actions';
+import { notificationPreferencesAPI } from './actions/notificationPreferencesAPI';
 
 export const DEVICE_TOKEN_KEY = 'device_token';
 export const DEVICE_TOKEN_EVENT = 'nexguard:device-token';
@@ -40,27 +45,66 @@ export const requestForToken = async (): Promise<string | null> => {
     const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY as
       | string
       | undefined;
+
+    if (!vapidKey) {
+      console.error(
+        'VAPID key is not configured. Please add NEXT_PUBLIC_FIREBASE_VAPID_KEY to your environment variables.'
+      );
+      return null;
+    }
+
     let serviceWorkerRegistration: ServiceWorkerRegistration | undefined;
 
     if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-      serviceWorkerRegistration =
-        (await navigator.serviceWorker.getRegistration(
-          '/firebase-messaging-sw.js'
-        )) || (await navigator.serviceWorker.ready);
+      // First, try to find existing Firebase messaging SW
+      const allRegistrations = await navigator.serviceWorker.getRegistrations();
+      console.log(
+        'All SW registrations:',
+        allRegistrations.map((r) => ({
+          scope: r.scope,
+          scriptURL: r.active?.scriptURL
+        }))
+      );
+
+      serviceWorkerRegistration = allRegistrations.find((reg) =>
+        reg.active?.scriptURL.includes('firebase-messaging-sw.js')
+      );
+
+      // If not found, register it explicitly
+      if (!serviceWorkerRegistration) {
+        console.log('Registering Firebase messaging service worker...');
+        try {
+          serviceWorkerRegistration = await navigator.serviceWorker.register(
+            '/firebase-messaging-sw.js',
+            { scope: '/firebase-cloud-messaging-push-scope' }
+          );
+          console.log('Firebase messaging SW registered successfully');
+
+          // Wait for it to activate
+          await navigator.serviceWorker.ready;
+        } catch (error) {
+          console.error('Failed to register Firebase messaging SW:', error);
+          return null;
+        }
+      } else {
+        console.log('Found existing Firebase messaging SW:', {
+          scope: serviceWorkerRegistration.scope,
+          scriptURL: serviceWorkerRegistration.active?.scriptURL
+        });
+      }
     }
 
-    const getTokenOptions: {
-      vapidKey?: string;
-      serviceWorkerRegistration?: ServiceWorkerRegistration;
-    } = {};
-
-    if (vapidKey) {
-      getTokenOptions.vapidKey = vapidKey;
+    if (!serviceWorkerRegistration) {
+      console.error('Failed to get service worker registration');
+      return null;
     }
 
-    if (serviceWorkerRegistration) {
-      getTokenOptions.serviceWorkerRegistration = serviceWorkerRegistration;
-    }
+    console.log('Using SW:', serviceWorkerRegistration.scope);
+
+    const getTokenOptions = {
+      vapidKey,
+      serviceWorkerRegistration
+    };
 
     const currentToken = await getToken(messaging, getTokenOptions);
 
@@ -120,17 +164,41 @@ export const toggleNotification = async (enabled: boolean) => {
     if (enabled) {
       await requestNotificationPermission();
     } else {
-      // Note: browsers don't allow programmatic revoking of permission.
-      console.info(
-        'To fully disable notifications, user must revoke permission in browser settings.'
-      );
-      // remove stored token locally
+      // Get the stored token before removing it
+      const storedToken =
+        localStorage.getItem(DEVICE_TOKEN_KEY) ||
+        sessionStorage.getItem(DEVICE_TOKEN_KEY);
+
+      if (storedToken && messaging) {
+        // Delete token from Firebase Cloud Messaging
+        try {
+          await deleteToken(messaging);
+          console.log('✓ FCM token deleted from Firebase servers');
+        } catch (error) {
+          console.error('Error deleting FCM token:', error);
+        }
+
+        // Unregister token from backend
+        try {
+          await unregisterDeviceToken(storedToken);
+          console.log('✓ Device token unregistered from backend');
+        } catch (error) {
+          console.error('Error unregistering token from backend:', error);
+        }
+      }
+
+      // Remove stored token locally
       try {
         localStorage.removeItem(DEVICE_TOKEN_KEY);
       } catch {}
       try {
         sessionStorage.removeItem(DEVICE_TOKEN_KEY);
       } catch {}
+
+      // Note: browsers don't allow programmatic revoking of permission.
+      console.info(
+        'To fully disable notifications, user must revoke permission in browser settings.'
+      );
     }
   } catch (error) {
     console.error('Error toggling notification:', error);
@@ -140,6 +208,10 @@ export const toggleNotification = async (enabled: boolean) => {
 /**
  * Subscribe to foreground FCM messages.
  * Returns an unsubscribe function for cleanup.
+ *
+ * Note: The backend handles preference filtering via topic subscriptions.
+ * This function logs preference status for debugging but shows all messages
+ * that reach the client (since they've already passed backend filtering).
  */
 export const subscribeToForegroundMessages = (
   callback: (payload: MessagePayload) => void
@@ -150,9 +222,30 @@ export const subscribeToForegroundMessages = (
   }
 
   try {
-    const unsubscribe = onMessage(messaging, (payload) => {
-      console.log('Message received: ', payload);
-      callback(payload);
+    const unsubscribe = onMessage(messaging, async (payload) => {
+      console.log('📩 Foreground message received:', payload);
+
+      // Log user preferences for debugging (backend already filtered via topics)
+      try {
+        const preferences = await notificationPreferencesAPI.getPreferences();
+        console.log('👤 User preferences:', preferences);
+
+        const notificationType =
+          payload.data?.notification_type || payload.data?.type;
+        console.log('🔔 Notification type:', notificationType);
+
+        // Backend already handles filtering via topic subscriptions
+        // If message reached here, user is subscribed to the topic
+        // Show the notification
+        callback(payload);
+      } catch (error) {
+        console.error(
+          'Error fetching preferences (showing notification anyway):',
+          error
+        );
+        // On error, still show the notification
+        callback(payload);
+      }
     });
 
     return () => {

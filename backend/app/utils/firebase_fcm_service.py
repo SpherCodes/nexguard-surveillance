@@ -66,13 +66,14 @@ class Firebase_FCM_Service:
             raise Exception(f"Failed to send multicast notification: {e}")
 
 
-    def send_fcm_to_topic(self, topic, title, body):
+    def send_fcm_to_topic(self, topic, title, body, data=None):
         print(f"Sending FCM message to topic {topic}")
         message = messaging.Message(
             notification=messaging.Notification(
                 title=title,
                 body=body
             ),
+            data={k: str(v) for k, v in (data or {}).items()},
             topic=topic
         )
         try:
