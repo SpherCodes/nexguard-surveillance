@@ -21,6 +21,7 @@ export default function RootLayout({
 }>) {
 
   useEffect(() => {
+    // Clean up any incorrectly registered service workers
     if (typeof window !== "undefined" && "serviceWorker" in navigator) {
       (async () => {
         try {
@@ -59,7 +60,7 @@ export default function RootLayout({
             console.log("ℹ️ PWA Service Worker already registered");
           }
         } catch (err) {
-          console.error("❌ Service Worker registration failed:", err);
+          console.error("❌ Service Worker cleanup failed:", err);
         }
       })();
     }

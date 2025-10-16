@@ -289,14 +289,7 @@ class VideoCapture:
             actual_height, actual_width = frame.shape[:2]
             if (actual_width, actual_height) != config.resolution:
                 frame = cv2.resize(frame, config.resolution)
-            
-            # Apply zone of interest mask if specified
-            # if config.zone_of_interest:
-            #     mask = np.zeros(frame.shape[:2], dtype=np.uint8)
-            #     points = np.array(config.zone_of_interest, dtype=np.int32)
-            #     cv2.fillPoly(mask, [points], 255)
-            #     frame = cv2.bitwise_and(frame, frame, mask=mask)
-            
+                
             # Create frame data object
             frame_data = FrameData(
                 frame=frame,

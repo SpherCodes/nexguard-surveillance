@@ -47,7 +47,7 @@ class YOLOProcessor:
             raise FileNotFoundError(f"Model file not found: {resolved_path}")
 
         with self._model_lock:
-            print(f"🧠 Loading YOLO model from {resolved_path}")
+            print(f"Loading YOLO model from {resolved_path}")
             self.model = YOLO(str(resolved_path))
             self.model_path = resolved_path
             if conf_threshold is not None:
@@ -190,9 +190,6 @@ class YOLOProcessor:
                     if self.detection_manager:
                         self.detection_manager.record_detection(camera_id, frame_data, detection , self)
                     
-                    # Track human detection for UI
-                    # if detection['name'].lower() == 'person':
-                    #     print(f"Human detected in camera {camera_id}")
             # Create annotated frame
             annotated_frame = frame_data.frame.copy()
             
