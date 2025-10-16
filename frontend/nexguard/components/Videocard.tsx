@@ -1,5 +1,5 @@
-import { Wifi, MoreHorizontal, AlertTriangle } from 'lucide-react'
-import { useEffect, useState } from 'react';
+import { Wifi, MoreHorizontal, AlertTriangle, Settings, Maximize2, Download, RefreshCw, Power } from 'lucide-react'
+import { useEffect, useState, useRef } from 'react';
 import React from 'react';
 import { Camera } from '@/Types';
 import { webRTCManager } from '@/lib/services/webrtc_manager';
@@ -11,7 +11,9 @@ import { webRTCManager } from '@/lib/services/webrtc_manager';
 const Videocard = ({ camera, compact = false, autoPause = true }: { camera: Camera, compact?: boolean, autoPause?: boolean }) => {
   const videoRef = React.useRef<HTMLVideoElement>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const [isVisible, setIsVisible] = useState(true);
+  const [showMenu, setShowMenu] = useState(false);
   const timestamp = new Date().toLocaleString('en-US', { 
     month: '2-digit', 
     day: '2-digit', 
@@ -77,6 +79,82 @@ useEffect(() => {
     return () => observer.disconnect();
   }, [autoPause]);
 
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setShowMenu(false);
+      }
+    };
+
+    if (showMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showMenu]);
+
+  // Menu action handlers
+  const handleFullscreen = () => {
+    if (videoRef.current) {
+      if (videoRef.current.requestFullscreen) {
+        videoRef.current.requestFullscreen();
+      }
+    }
+    setShowMenu(false);
+  };
+
+  const handleRefresh = async () => {
+    const videoElement = videoRef.current;
+    if (!camera.enabled || !camera.cameraId || !videoElement) return;
+    
+    try {
+      // Reconnect to stream
+      const stream = await webRTCManager.getStream(camera.cameraId);
+      if (stream) {
+        videoElement.srcObject = stream;
+        await videoElement.play();
+      }
+    } catch (err) {
+      console.error('Failed to refresh stream:', err);
+    }
+    setShowMenu(false);
+  };
+
+  const handleSnapshot = () => {
+    if (videoRef.current) {
+      const canvas = document.createElement('canvas');
+      canvas.width = videoRef.current.videoWidth;
+      canvas.height = videoRef.current.videoHeight;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(videoRef.current, 0, 0);
+        canvas.toBlob((blob) => {
+          if (blob) {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${camera.name}-${Date.now()}.png`;
+            a.click();
+            URL.revokeObjectURL(url);
+          }
+        });
+      }
+    }
+    setShowMenu(false);
+  };
+
+  const handleSettings = () => {
+    // TODO: Navigate to camera settings page
+    console.log('Open settings for camera:', camera.cameraId);
+    setShowMenu(false);
+  };
+
+  const handleTogglePower = () => {
+    // TODO: Implement enable/disable camera functionality
+    console.log('Toggle power for camera:', camera.cameraId);
+    setShowMenu(false);
+  };
+
   return (
     <div ref={containerRef} className={`group relative aspect-video w-full overflow-hidden ${compact ? 'rounded-lg shadow-md' : 'rounded-xl shadow-lg'} hover:shadow-xl transition-shadow duration-300`}>
       {/* Video/Image Background */}
@@ -111,9 +189,67 @@ useEffect(() => {
       
       {/* Enhanced Options Menu Button */}
       {!compact && (
-        <button className="absolute right-2 sm:right-3 top-2 sm:top-3 rounded-full bg-black/40 p-1.5 sm:p-2 backdrop-blur-sm transition-all duration-200 hover:bg-black/60 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-white/50">
-          <MoreHorizontal className="h-3 w-3 sm:h-4 sm:w-4 text-white" />
-        </button>
+        <div ref={menuRef} className="absolute right-2 sm:right-3 top-2 sm:top-3">
+          <button 
+            onClick={() => setShowMenu(!showMenu)}
+            className="rounded-full bg-black/40 p-1.5 sm:p-2 backdrop-blur-sm transition-all duration-200 hover:bg-black/60 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-white/50"
+          >
+            <MoreHorizontal className="h-3 w-3 sm:h-4 sm:w-4 text-white" />
+          </button>
+          
+          {/* Dropdown Menu */}
+          {showMenu && (
+            <div className="absolute right-0 mt-1 w-40 rounded-md bg-white dark:bg-gray-800 shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden z-50">
+              <div className="py-0.5">
+                <button
+                  onClick={handleFullscreen}
+                  className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                >
+                  <Maximize2 className="h-3 w-3" />
+                  <span>Fullscreen</span>
+                </button>
+                
+                <button
+                  onClick={handleSnapshot}
+                  className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                >
+                  <Download className="h-3 w-3" />
+                  <span>Snapshot</span>
+                </button>
+                
+                <button
+                  onClick={handleRefresh}
+                  className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                >
+                  <RefreshCw className="h-3 w-3" />
+                  <span>Refresh</span>
+                </button>
+                
+                <div className="border-t border-gray-200 dark:border-gray-700 my-0.5"></div>
+                
+                <button
+                  onClick={handleSettings}
+                  className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                >
+                  <Settings className="h-3 w-3" />
+                  <span>Settings</span>
+                </button>
+                
+                <button
+                  onClick={handleTogglePower}
+                  className={`flex items-center gap-2 w-full px-3 py-1.5 text-xs transition-colors ${
+                    camera.enabled 
+                      ? 'text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20' 
+                      : 'text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20'
+                  }`}
+                >
+                  <Power className="h-3 w-3" />
+                  <span>{camera.enabled ? 'Disable' : 'Enable'}</span>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
       {/* Enhanced Bottom Information Panel */}
