@@ -6,6 +6,7 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { Toaster } from 'sonner';
 import { webRTCManager } from '@/lib/services/webrtc_manager';
 import ServiceWorkerRegistration from '@/components/ServiceWorkerRegistration';
+import PWAInstallPrompt from '@/components/PWAInstallPrompt';
 import { NotificationProvider } from '@/context/NotificationContext';
 
 export function Providers({ children }: { children: ReactNode }) {
@@ -20,6 +21,7 @@ export function Providers({ children }: { children: ReactNode }) {
     <QueryClientProvider client={queryClient}>
       <NotificationProvider>
         <ServiceWorkerRegistration />
+        <PWAInstallPrompt />
   <div className="min-h-screen">{children}</div>
         <Toaster 
           position="top-right"
