@@ -2,7 +2,7 @@
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactNode, useState, useEffect } from 'react';
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
+// import { ReactQueryDevtools } from '@tanstack/react-query-devtools'; // Removed - DevTools disabled
 import { Toaster } from 'sonner';
 import { webRTCManager } from '@/lib/services/webrtc_manager';
 import ServiceWorkerRegistration from '@/components/ServiceWorkerRegistration';
@@ -44,7 +44,8 @@ export function Providers({ children }: { children: ReactNode }) {
             },
           }}
         />
-        <ReactQueryDevtools initialIsOpen={false} />
+        {/* <ReactQueryDevtools initialIsOpen={false} /> */}
+        {/* TanStack DevTools removed for cleaner production-like experience */}
       </NotificationProvider>
     </QueryClientProvider>
   );
