@@ -8,6 +8,7 @@ from ...core.database.connection import get_db
 from ...dependencies import DatabaseDep, get_alert_service
 from ...services.alert_service import AlertService
 from ...middleware.middleware import require_approved_user
+from ...core.models import UserDeviceToken
 from ...schema.notification import (
     DeviceTokenRequest, 
     DeviceTokenResponse,
@@ -57,15 +58,29 @@ def unregister_device_token(
 ):
     """
     Remove a previously-registered FCM device token for the current user.
-    Expects device token as path parameter
+    Expects device token as path parameter. Deletes the token from database.
     """
     try:
         logger.info(f"Unregistering device token for user {current_user.username}: {device_token}")
         print("Unregistering device token:", device_token)
-        #token is marked as inactive
-        removed = alert_service._mark_invalid_tokens(db, device_token)
+        
+        # Delete the token from database (not just mark inactive)
+        token_record = db.query(UserDeviceToken).filter(
+            UserDeviceToken.device_token == device_token,
+            UserDeviceToken.user_id == current_user.id
+        ).first()
+        
+        if token_record:
+            db.delete(token_record)
+            db.commit()
+            logger.info(f"Device token deleted from database for user {current_user.username}")
+            print(f"✓ Device token deleted from database")
+        else:
+            logger.warning(f"Device token not found for user {current_user.username}")
+            
         return {"message": "Device token unregistered successfully"}
     except Exception as e:
+        db.rollback()
         print(f"Error unregistering device token: {e}")
         logger.exception("Error unregistering device token")
         raise HTTPException(
