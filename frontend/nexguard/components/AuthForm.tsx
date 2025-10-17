@@ -283,7 +283,7 @@ const AuthForm = ({type}: {type: 'Sign-in' | 'Sign-up'}) => {
                                     href={type === 'Sign-in' ? '/sign-up' : '/sign-in'} 
                                     className="text-gray-900 hover:underline font-bold"
                                 >
-                                    {type === 'Sign-in' ? 'Sign up for free' : 'Sign in here'}
+                                    {type === 'Sign-in' ? 'Sign up' : 'Sign in here'}
                                 </a>
                             </p>
                         </div>
