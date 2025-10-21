@@ -6,6 +6,7 @@ from sqlalchemy import or_
 from dotenv import load_dotenv
 import os
 from passlib.context import CryptContext
+from passlib.exc import PasswordValueError
 
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError
@@ -26,7 +27,10 @@ if not SECRET_KEY:
     raise ValueError("SECRET_KEY environment variable is required")
 
 auth_scheme = OAuth2PasswordBearer(tokenUrl="token")
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(
+    schemes=["argon2", "bcrypt_sha256"],
+    deprecated="auto"
+)
 
 class AuthService(CRUDBase[User, UserCreate, UserUpdate]):
     """Service for user authentication and management operations"""
@@ -240,8 +244,26 @@ class AuthService(CRUDBase[User, UserCreate, UserUpdate]):
             )
     
     def hash_password(self, password: str) -> str:
-        """Hash a password using bcrypt"""
-        return pwd_context.hash(password)
+        """Hash a password using Argon2 with bcrypt fallback."""
+        if password is None:
+            raise ValueError("Password cannot be None")
+
+        if not isinstance(password, str):
+            password = str(password)
+
+        # Helpful diagnostics for long secrets
+        password_length = len(password)
+        if password_length > 72:
+            print(f"[AuthService] Hashing password length: {password_length} (Argon2 preferred)")
+
+        try:
+            hashed = pwd_context.hash(password)
+            return hashed
+        except PasswordValueError as exc:
+            print(f"[AuthService] Password hashing failed for length {password_length}: {exc}")
+            raise ValueError(
+                "Password hashing failed. Ensure the password is a UTF-8 string."
+            ) from exc
     
     def verify_password(self, plain_password: str, hashed_password: str) -> bool:
         """Verify a password against its hash"""

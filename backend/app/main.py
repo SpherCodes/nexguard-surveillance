@@ -21,6 +21,8 @@ def setup_database():
         # Use settings from config
         settings.DATA_DIR.mkdir(parents=True, exist_ok=True)
         db_path = settings.DATA_DIR / "nexguard.db"
+        print(f"Database path: {db_path}")
+        print(f"Using DATABASE_URL: {settings.DATABASE_URL}")
 
         if not db_path.exists():
             print("📦 Database file not found. Applying migrations...")
@@ -88,7 +90,9 @@ async def lifespan(app: FastAPI):
         print("🧹 Cleanup service started")
 
     except Exception as e:
+        import traceback
         print(f"❌ Failed to initialize cameras: {e}")
+        traceback.print_exc()
         raise
     finally:
         db.close()
@@ -126,12 +130,11 @@ async def root():
     return {"message": "Welcome to the NexGuard API!"}
 
 
-@app.get("/health")
+@app.get("/api/health")
 async def health_check():
     return {
         "status": "healthy",
-        "database_url": settings.DATABASE_URL,
-        "debug_mode": settings.DEBUG
+        "database_url": settings.DATABASE_URL
     }
 
 

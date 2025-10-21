@@ -13,7 +13,7 @@ load_dotenv()
 # Add the parent directory to the path so we can import our models
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
-# Import your models
+# Import your models and settings
 from core.models import Base
 from Settings import Settings
 

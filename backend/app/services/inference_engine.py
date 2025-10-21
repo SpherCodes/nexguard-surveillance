@@ -66,8 +66,6 @@ class YOLOProcessor:
             self.detection_manager.inference_engine = self
     
     def start_processing(self, camera_ids, video_capture: VideoCapture = None):
-        print(f"Starting YOLO processing for cameras: {camera_ids}")
-        print(f"VideoCapture instance: {video_capture}")
         """
         Start processing threads for specified cameras or all enabled cameras.
         
@@ -129,7 +127,6 @@ class YOLOProcessor:
         # Get all processing threads if none specified
         if camera_ids is None:
             camera_ids = list(self.processing_threads.keys())
-
         # Set stop flags
         for camera_id in camera_ids:
             if camera_id in self.stop_flags:

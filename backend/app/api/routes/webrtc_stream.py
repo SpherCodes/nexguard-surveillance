@@ -1,11 +1,8 @@
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect, status
 from aiortc import RTCIceCandidate
 import json
-import asyncio
 
-from ...utils.detection_manager import DetectionEventManager
-
-from ...dependencies import get_detection_event_manager, get_inference_engine, get_video_capture
+from ...dependencies import get_inference_engine, get_video_capture
 from ...services.video_capture import VideoCapture
 from ...services.inference_engine import YOLOProcessor as inference_engine
 from ...services.webrtc import RTCSessionManager

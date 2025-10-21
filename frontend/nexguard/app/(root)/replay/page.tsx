@@ -4,7 +4,7 @@ import { useSearchParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 
-export default function Replay() {
+function ReplayContent() {
   const searchParams = useSearchParams();
   const [currentId, setCurrentId] = useState<string | null>(null);
 
@@ -62,5 +62,13 @@ export default function Replay() {
         </div>
       </div>
     </section>
+  )
+}
+
+export default function Replay() {
+  return (
+    <Suspense fallback={<p>Loading...</p>}>
+      <ReplayContent />
+    </Suspense>
   )
 }
