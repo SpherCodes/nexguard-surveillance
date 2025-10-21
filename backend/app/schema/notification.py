@@ -49,6 +49,12 @@ class NotificationPreferenceUpdate(BaseModel):
     category: str
     enabled: bool
 
+
+class TopicSubscriptionRequest(BaseModel):
+    """Schema for subscribing/unsubscribing a token to a topic"""
+    device_token: str
+    topic: str
+
 class NotificationPreferenceResponse(BaseModel):
     """Schema for notification preference responses"""
     user_id: int

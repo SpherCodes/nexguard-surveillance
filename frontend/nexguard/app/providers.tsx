@@ -2,10 +2,11 @@
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactNode, useState, useEffect } from 'react';
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
+// import { ReactQueryDevtools } from '@tanstack/react-query-devtools'; // Removed - DevTools disabled
 import { Toaster } from 'sonner';
 import { webRTCManager } from '@/lib/services/webrtc_manager';
 import ServiceWorkerRegistration from '@/components/ServiceWorkerRegistration';
+import PWAInstallPrompt from '@/components/PWAInstallPrompt';
 import { NotificationProvider } from '@/context/NotificationContext';
 
 export function Providers({ children }: { children: ReactNode }) {
@@ -20,6 +21,7 @@ export function Providers({ children }: { children: ReactNode }) {
     <QueryClientProvider client={queryClient}>
       <NotificationProvider>
         <ServiceWorkerRegistration />
+        <PWAInstallPrompt />
   <div className="min-h-screen">{children}</div>
         <Toaster 
           position="top-right"
@@ -42,7 +44,8 @@ export function Providers({ children }: { children: ReactNode }) {
             },
           }}
         />
-        <ReactQueryDevtools initialIsOpen={false} />
+        {/* <ReactQueryDevtools initialIsOpen={false} /> */}
+        {/* TanStack DevTools removed for cleaner production-like experience */}
       </NotificationProvider>
     </QueryClientProvider>
   );

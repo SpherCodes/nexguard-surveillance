@@ -54,9 +54,8 @@ const AuthForm = ({type}: {type: 'Sign-in' | 'Sign-up'}) => {
                     email: data.email as string,
                 }
 
-                const newUser = await signUp(userData);
-                console.log('User registered successfully:', newUser);
-                
+                await signUp(userData);
+
                 setSuccess('Account created successfully! Please sign in.');
                 setTimeout(() => {
                     router.push('/sign-in');
@@ -81,10 +80,10 @@ const AuthForm = ({type}: {type: 'Sign-in' | 'Sign-up'}) => {
             }
         } catch (error: unknown) {
             console.error('Authentication failed:', error);
-            
+
             let errorMessage = 'An unexpected error occurred. Please try again.';
-            
-            if (error && typeof error === 'object' && 'message' in error && typeof error.message === 'string') {
+
+            if (error instanceof Error && error.message) {
                 errorMessage = error.message;
             } else if (typeof error === 'string') {
                 errorMessage = error;
@@ -284,7 +283,7 @@ const AuthForm = ({type}: {type: 'Sign-in' | 'Sign-up'}) => {
                                     href={type === 'Sign-in' ? '/sign-up' : '/sign-in'} 
                                     className="text-gray-900 hover:underline font-bold"
                                 >
-                                    {type === 'Sign-in' ? 'Sign up for free' : 'Sign in here'}
+                                    {type === 'Sign-in' ? 'Sign up' : 'Sign in here'}
                                 </a>
                             </p>
                         </div>

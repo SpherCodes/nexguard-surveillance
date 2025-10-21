@@ -8,8 +8,9 @@ import {
   subscribeToTopicLocal,
   unsubscribeFromTopic,
 } from '@/lib/actions/notification.actions';
-import { onMessageListener } from '@/lib/firebase';
+import { subscribeToForegroundMessages } from '@/lib/firebase';
 import { notifications } from '@/lib/services/notification.service';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface NotificationContextType {
   currentDeviceToken: string | null;
@@ -27,6 +28,7 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
   const [currentDeviceToken, setToken] = useState<string | null>(null);
   const [notificationPermission, setPermission] = useState<NotificationPermission>('default');
   const [tokens, setTokens] = useState<string[]>([]);
+  const queryClient = useQueryClient();
 
   // Request permission and fetch token
   const refreshToken = async () => {
@@ -78,20 +80,32 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
       setTokens([localToken]);
     }
 
-    setPermission(Notification.permission);
+    if (typeof Notification !== 'undefined') {
+      setPermission(Notification.permission);
+
+      if (Notification.permission === 'granted') {
+        refreshToken().catch((err) => {
+          console.error('Failed to refresh FCM token on mount', err);
+        });
+      }
+    }
 
     // Listen for foreground messages
-    onMessageListener()
-      .then((payload) => {
-        if (payload?.notification) {
-          const title = payload.notification.title || 'New Notification';
-          const description = payload.notification.body;
+    const unsubscribe = subscribeToForegroundMessages((payload) => {
+      if (payload?.notification) {
+        const title = payload.notification.title || 'New Notification';
+        const description = payload.notification.body;
 
-          notifications.detection(title, { description });
-        }
-      })
-      .catch((err) => console.error('Error listening for messages', err));
-  }, []);
+        notifications.detection(title, { description });
+      }
+
+      void queryClient.invalidateQueries({ queryKey: ['detectionEvents'] });
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [queryClient]);
 
   return (
     <NotificationContext.Provider

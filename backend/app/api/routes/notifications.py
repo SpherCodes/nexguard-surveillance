@@ -8,10 +8,12 @@ from ...core.database.connection import get_db
 from ...dependencies import DatabaseDep, get_alert_service
 from ...services.alert_service import AlertService
 from ...middleware.middleware import require_approved_user
+from ...core.models import UserDeviceToken
 from ...schema.notification import (
     DeviceTokenRequest, 
     DeviceTokenResponse,
-    NotificationPreferenceUpdate, 
+    NotificationPreferenceUpdate,
+    TopicSubscriptionRequest,
 )
 
 logger = logging.getLogger("nexguard.notifications")
@@ -56,15 +58,29 @@ def unregister_device_token(
 ):
     """
     Remove a previously-registered FCM device token for the current user.
-    Expects device token as path parameter
+    Expects device token as path parameter. Deletes the token from database.
     """
     try:
         logger.info(f"Unregistering device token for user {current_user.username}: {device_token}")
         print("Unregistering device token:", device_token)
-        #token is marked as inactive
-        removed = alert_service._mark_invalid_tokens(db, device_token)
+        
+        # Delete the token from database (not just mark inactive)
+        token_record = db.query(UserDeviceToken).filter(
+            UserDeviceToken.device_token == device_token,
+            UserDeviceToken.user_id == current_user.id
+        ).first()
+        
+        if token_record:
+            db.delete(token_record)
+            db.commit()
+            logger.info(f"Device token deleted from database for user {current_user.username}")
+            print(f"✓ Device token deleted from database")
+        else:
+            logger.warning(f"Device token not found for user {current_user.username}")
+            
         return {"message": "Device token unregistered successfully"}
     except Exception as e:
+        db.rollback()
         print(f"Error unregistering device token: {e}")
         logger.exception("Error unregistering device token")
         raise HTTPException(
@@ -74,16 +90,33 @@ def unregister_device_token(
 
 @router.post("/subscribe-topic")
 async def subscribe_to_topic(
-    request: NotificationPreferenceUpdate,
+    request: TopicSubscriptionRequest,
     current_user: UserResponse = Depends(require_approved_user),
     alert_service: AlertService = Depends(get_alert_service),
     db: Session = Depends(get_db)
 ):
     """Subscribe a device token to a Firebase topic"""
     try:
-        alert_service.update_user_notification_preferences(db, request)
+        subscribed = alert_service.subscribe_to_topic(db, request.device_token, request.topic)
+        if not subscribed:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Unable to subscribe device token to topic"
+            )
+
+        # Persist preference state
+        pref_update = NotificationPreferenceUpdate(
+            user_id=current_user.id,
+            token=request.device_token,
+            category=request.topic,
+            enabled=True
+        )
+        alert_service.update_user_notification_preferences(db, pref_update)
+
         logger.info(f"User {current_user.id} subscribed to topic {request.topic}")
         return {"message": f"Successfully subscribed to topic {request.topic}"}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Failed to subscribe to topic: {str(e)}")
         print(f"Failed to subscribe to topic: {str(e)}")
@@ -94,7 +127,7 @@ async def subscribe_to_topic(
 
 @router.post("/unsubscribe-topic")
 async def unsubscribe_from_topic(
-    request: NotificationPreferenceUpdate,
+    request: TopicSubscriptionRequest,
     current_user: UserResponse = Depends(require_approved_user),
     alert_service: AlertService = Depends(get_alert_service),
     db: Session = Depends(get_db)
@@ -112,8 +145,24 @@ async def unsubscribe_from_topic(
             request.device_token,
             request.topic
         )
+        if not result:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Unable to unsubscribe device token from topic"
+            )
+
+        pref_update = NotificationPreferenceUpdate(
+            user_id=current_user.id,
+            token=request.device_token,
+            category=request.topic,
+            enabled=False
+        )
+        alert_service.update_user_notification_preferences(db, pref_update)
+
         logger.info(f"User {current_user.id} unsubscribed from topic {request.topic}")
-        return {"message": f"Successfully unsubscribed from topic {request.topic}", "result": result}
+        return {"message": f"Successfully unsubscribed from topic {request.topic}"}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Failed to unsubscribe from topic: {str(e)}")
         print(f"Failed to unsubscribe from topic: {str(e)}")

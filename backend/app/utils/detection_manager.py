@@ -12,8 +12,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import cv2
 import numpy as np
 
-from ..core.models import User
-from ..core.database.connection import get_db
+from ..core.database.connection import SessionLocal
 
 from ..services.camera_service import camera_service
 from ..services.media_service import media_service
@@ -22,16 +21,16 @@ from ..services.detection_service import detection_service
 
 from ..schema.FrameData import FrameData
 from ..schema.detection import Detection, DetectionCreate
-from ..schema.media import MediaCreate
+from ..schema.media import MediaCreate, MediaType
 from ..Settings import settings
 
 class DetectionEventManager:
     """Manages detection events"""
     def __init__(self, alert_service):
-        self.db = next(get_db())
         self.storage_path = Path(settings.STORAGE_DIR)
         self.events = []
         self.alert_service = alert_service
+        self._session_factory = SessionLocal
         self.active_recordings: Dict[str, Dict] = {}
         self.recording_lock = threading.Lock()
         self.video_duration = 30
@@ -88,78 +87,79 @@ class DetectionEventManager:
         if self.is_in_cooldown(camera_id, detection):
             return None
 
+        detection_record: Optional[Detection] = None
+        camera_display_name: Optional[str] = None
+
         try:
-            # --- Create detection record ---
-            detection_event = DetectionCreate(
-                camera_id=int(camera_id),
-                timestamp=frame_data.timestamp,
-                detection_type=detection.get("name", ""),
-                confidence=detection.get("conf", 0.0),
-            )
-            db_detection = detection_service.create_detection(self.db, detection_event)
-
-            # Start video capture thread
-            self._start_video_recording(
-                camera_id,
-                detection_event.timestamp,
-                db_detection.id if db_detection else 1,
-            )
-
-            # --- Send alert notification ---
-            if self.alert_service and db_detection and self.enable_alerts:
-                try:
-                    camera = camera_service.get_by_camera_id(self.db, camera_id)
-                    camera_name = camera.name if camera else f"Camera {camera_id}"
-                    self.send_detection_alert_sync(db_detection, camera_name)
-                except Exception as e:
-                    print(f"Error sending alert notifications: {e}")
-            else:
-                print("Alert service not available or detection creation failed")
-
-            # --- Media Processing (Image) ---
-            try:
-                date_parts = datetime.fromtimestamp(
-                    detection_event.timestamp
-                ).strftime("%Y/%m/%d").split("/")
-                camera = camera_service.get_by_camera_id(self.db, camera_id)
-
-                abs_img_dir = settings.STORAGE_IMG_DIR / camera.name / Path(*date_parts)
-                rel_img_dir = settings.STORAGE_IMG_DIR / camera.name / Path(*date_parts)
-                abs_img_dir.mkdir(parents=True, exist_ok=True)
-
-                base_filename = (
-                    f"{camera_id}_{int(detection_event.timestamp)}_{detection_event.detection_type}.jpg"
-                )
-                abs_image_path = abs_img_dir / base_filename
-                rel_img_path = rel_img_dir / base_filename
-
-                annotated_frame = self._annotate_frame(
-                    frame_data.frame, detection, detection_event.timestamp
-                )
-                cv2.imwrite(str(abs_image_path), annotated_frame)
-
-                # --- Normalize relative path ---
-
-                rel_path = str(rel_img_path).replace("\\", "/")  # normalize for DB storage
-
-                image_media = MediaCreate(
+            with self._session_factory() as db:
+                # --- Create detection record ---
+                detection_event = DetectionCreate(
                     camera_id=int(camera_id),
-                    detection_id=db_detection.id,
-                    media_type="image",
-                    path=rel_path,
-                    timestamp=detection_event.timestamp,
-                    size_bytes=os.path.getsize(abs_image_path),
+                    timestamp=frame_data.timestamp,
+                    detection_type=detection.get("name", ""),
+                    confidence=detection.get("conf", 0.0),
                 )
-                media_service.create_media(self.db, image_media)
 
-                return db_detection
+                db_detection = detection_service.create_detection(db, detection_event)
+                if not db_detection:
+                    print("Detection creation returned None")
+                    return None
 
-            except Exception as e:
-                print(f"Error saving detection media: {e}")
-                import traceback
+                detection_record = Detection.model_validate(db_detection)
 
-                traceback.print_exc()
-                return None
+                camera_obj = camera_service.get_by_camera_id(db, int(camera_id))
+                camera_display_name = (
+                    camera_obj.name if camera_obj and camera_obj.name else f"Camera {camera_id}"
+                )
+                camera_storage_name = camera_display_name or f"camera_{camera_id}"
+
+                # Start video capture thread
+                self._start_video_recording(
+                    camera_id,
+                    camera_storage_name,
+                    detection_event.timestamp,
+                    detection_record.id,
+                )
+
+                # --- Media Processing (Image) ---
+                try:
+                    date_parts = datetime.fromtimestamp(
+                        detection_event.timestamp
+                    ).strftime("%Y/%m/%d").split("/")
+
+                    abs_img_dir = settings.STORAGE_IMG_DIR / camera_storage_name / Path(*date_parts)
+                    rel_img_dir = settings.STORAGE_IMG_DIR / camera_storage_name / Path(*date_parts)
+                    abs_img_dir.mkdir(parents=True, exist_ok=True)
+
+                    base_filename = (
+                        f"{camera_id}_{int(detection_event.timestamp)}_{detection_event.detection_type}.jpg"
+                    )
+                    abs_image_path = abs_img_dir / base_filename
+                    rel_img_path = rel_img_dir / base_filename
+
+                    annotated_frame = self._annotate_frame(
+                        frame_data.frame, detection, detection_event.timestamp
+                    )
+                    cv2.imwrite(str(abs_image_path), annotated_frame)
+
+                    rel_path = str(rel_img_path).replace("\\", "/")  # normalize for DB storage
+
+                    image_media = MediaCreate(
+                        camera_id=int(camera_id),
+                        detection_id=detection_record.id,
+                        media_type=MediaType.IMAGE,
+                        path=rel_path,
+                        timestamp=detection_event.timestamp,
+                        size_bytes=os.path.getsize(abs_image_path),
+                    )
+                    media_service.create_media(db, image_media)
+
+                except Exception as media_error:
+                    print(f"Error saving detection media: {media_error}")
+                    import traceback
+
+                    traceback.print_exc()
+                    return None
 
         except Exception as e:
             print(f"Error recording detection: {e}")
@@ -167,6 +167,16 @@ class DetectionEventManager:
 
             traceback.print_exc()
             return None
+
+        if self.alert_service and detection_record and self.enable_alerts:
+            try:
+                self.send_detection_alert_sync(detection_record, camera_display_name)
+            except Exception as e:
+                print(f"Error sending alert notifications: {e}")
+        else:
+            print("Alert service not available or detection creation failed")
+
+        return detection_record
 
             
     async def send_detection_alert(self, detection: Detection, camera_name: str = None) -> bool:
@@ -176,38 +186,21 @@ class DetectionEventManager:
             return False
             
         try:
-            # Determine zone name
-            zone_name = camera_name or f"Camera {detection.camera_id}"
-            
-            # Get all active users
-            users = self.db.query(User).filter(User.is_active == True).all()
-            
-            notification_sent = False
-            # Prepare notification content
-            notif_title = "🚨 Security Alert"
-            notif_body = f"{detection.detection_type.title()} detected in {zone_name} (Confidence: {detection.confidence:.1%})"
-            notif_data = {
-                "detection_id": str(detection.id),
-                "camera_id": str(detection.camera_id),
-                "detection_type": detection.detection_type,
-                "confidence": str(detection.confidence),
-                "timestamp": str(detection.timestamp),
-                "zone_name": zone_name,
-                "alert_type": "detection"
-            }
-            
-            # Also send to alerts topic for subscribed users
             try:
-                await asyncio.to_thread(self.alert_service.send_alert, self.db, detection)
+                await asyncio.to_thread(self._send_alert_with_session, detection)
+                return True
             except Exception as topic_error:
                 print(f"Error sending topic alert: {topic_error}")
-            
-            return notification_sent
+                return False
         except Exception as e:
             print(f"Error in send_detection_alert: {e}")
             import traceback
             traceback.print_exc()
             return False
+
+    def _send_alert_with_session(self, detection: Detection) -> None:
+        with self._session_factory() as db:
+            self.alert_service.send_alert(db, detection)
 
     def send_detection_alert_sync(self, detection: Detection, camera_name: str = None) -> None:
         """Synchronous wrapper for sending detection alerts"""
@@ -251,17 +244,17 @@ class DetectionEventManager:
         
         return annotated_frame
 
-    def _start_video_recording(self, camera_id: str, trigger_timestamp: float, detection_id: int = 1):
+    def _start_video_recording(self, camera_id: str, camera_name: str, trigger_timestamp: float, detection_id: int = 1):
         """Start video recording for a detection event"""
-        camera = camera_service.get_by_camera_id(self.db, camera_id)
-        if not camera:
-            print(f"Camera {camera_id} not found")
+        if not camera_name:
+            print(f"Camera name missing for {camera_id}, skipping video recording")
             return
-            
+
         with self.recording_lock:
             date_parts = datetime.fromtimestamp(trigger_timestamp).strftime("%Y/%m/%d").split('/')
-            abs_video_dir = settings.STORAGE_VIDEO_DIR / camera.name / Path(*date_parts)
-            rel_video_dir = self.storage_path / "videos" / camera.name / Path(*date_parts)
+            abs_video_dir = settings.STORAGE_VIDEO_DIR / camera_name / Path(*date_parts)
+            rel_video_dir = self.storage_path / "videos" / camera_name / Path(*date_parts)
+            abs_video_dir.mkdir(parents=True, exist_ok=True)
             
             if camera_id in self.active_recordings:
                 self.active_recordings[camera_id]['end_time'] = trigger_timestamp + self.video_duration
@@ -425,13 +418,14 @@ class DetectionEventManager:
             video_media = MediaCreate(
                 camera_id=int(camera_id),
                 detection_id=detection_id,
-                media_type="video",
+                media_type=MediaType.VIDEO,
                 path=rel_video_path,
                 timestamp=timestamp,
                 duration=duration,
                 size_bytes=file_size,
             )
-            media_service.create_media(self.db, video_media)
+            with self._session_factory() as db:
+                media_service.create_media(db, video_media)
             print(f"✓ Video media record created in database")
 
         except subprocess.CalledProcessError as e:

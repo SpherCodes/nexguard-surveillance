@@ -33,7 +33,7 @@ const FeedCard = ({ alertEvent}: FeedProps) => {
   }
 
   return (
-    <div className="group bg-white rounded-2xl ring-1 ring-gray-200 p-3 hover:shadow-sm hover:ring-gray-300 transition-all duration-200 w-full max-w-full overflow-hidden"
+  <div className="group bg-white rounded-2xl ring-1 ring-gray-200 p-3 hover:shadow-sm hover:ring-gray-300 transition-all duration-200 w-full max-w-full overflow-hidden cursor-default hover:cursor-pointer"
       onClick={() => handleCardClick(alertEvent.id)}>
       {/* Compact Header */}
       <div className="flex items-center justify-between mb-3 min-w-0">

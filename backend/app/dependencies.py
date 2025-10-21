@@ -1,9 +1,8 @@
 """
 FastAPI dependencies with database integration
 """
-from functools import lru_cache
+from pathlib import Path
 from typing import Generator, Annotated, Optional
-from webbrowser import get
 from fastapi import Depends
 from sqlalchemy.orm import Session
 
@@ -14,7 +13,7 @@ from .utils import firebase_fcm_service
 
 
 
-from .core.database.connection import get_db
+from .core.database.connection import get_db, SessionLocal
 from .services.camera_service import camera_service
 from .services.zone_service import zone_service
 from .services.detection_service import detection_service
@@ -22,6 +21,7 @@ from .services.video_capture import VideoCapture
 from .services.inference_engine import YOLOProcessor as InferenceEngine
 from .utils.detection_manager import DetectionEventManager
 from .services.sys_config_service import SysConfigService
+from .schema.sysconfig import SysInferenceConfig
 
 _video_capture: Optional[VideoCapture] = None
 _inference_engine: Optional[InferenceEngine] = None
@@ -36,26 +36,49 @@ def get_video_capture() -> VideoCapture:
         _video_capture = VideoCapture()
     return _video_capture
 
-def get_inference_engine() -> InferenceEngine:
-    """Get inference engine instance with detection manager"""
-    sys_config_service = get_sys_config_service()
-    sysInferenceConfig = sys_config_service.get_inference_config(next(get_db()))
+def ensure_inference_engine(config: SysInferenceConfig | None = None, force_reload: bool = False) -> InferenceEngine:
+    """Ensure the global inference engine is initialized and synced with configuration."""
     global _inference_engine
-    if _inference_engine is None:
-        # Find the model path from available models by matching the current model name
-        model_path = None
-        if sysInferenceConfig.available_models:
-            for model in sysInferenceConfig.available_models:
-                if model.name == sysInferenceConfig.model:
-                    model_path = model.path
-                    break
-        
-        if not model_path:
-            raise ValueError(f"Model path not found for model: {sysInferenceConfig.model}")
-            
-        detection_manager = get_detection_event_manager()
-        _inference_engine = InferenceEngine(model_path=model_path,conf_threshold=sysInferenceConfig.min_detection_threshold,detection_manager=detection_manager)
+
+    if config is None:
+        db_session = SessionLocal()
+        try:
+            config = get_sys_config_service().get_inference_config(db_session)
+        finally:
+            db_session.close()
+
+    if not config.available_models:
+        raise ValueError("No AI models are registered for inference")
+
+    selected_model = next((m for m in config.available_models if m.name == config.model), None)
+    if not selected_model:
+        raise ValueError(f"Model '{config.model}' is not registered")
+
+    model_path = Path(settings.get_absolute_model_path(selected_model.path))
+    detection_manager = get_detection_event_manager()
+    video_capture = get_video_capture()
+
+    if _inference_engine is None or force_reload:
+        _inference_engine = InferenceEngine(
+            model_path=str(model_path),
+            conf_threshold=config.min_detection_threshold,
+            detection_manager=detection_manager,
+        )
+    else:
+        if _inference_engine.model_path != model_path:
+            _inference_engine.load_model(model_path, conf_threshold=config.min_detection_threshold)
+        else:
+            _inference_engine.set_conf_threshold(config.min_detection_threshold)
+
+    if _inference_engine.video_capture is None and video_capture is not None:
+        _inference_engine.connect_video_capture(video_capture)
+
     return _inference_engine
+
+
+def get_inference_engine(force_reload: bool = False) -> InferenceEngine:
+    """Get inference engine instance with detection manager."""
+    return ensure_inference_engine(force_reload=force_reload)
 
 def get_sys_config_service() -> SysConfigService:
     """Get system configuration service instance"""
@@ -110,3 +133,4 @@ CameraServiceDep = Annotated[object, Depends(get_camera_service)]
 ZoneServiceDep = Annotated[object, Depends(get_zone_service)]
 DetectionServiceDep = Annotated[object, Depends(get_detection_service)]
 VideoCaptureServiceDep = Annotated[VideoCapture, Depends(get_video_capture)]
+InferenceEngineDep = Annotated[InferenceEngine, Depends(get_inference_engine)]

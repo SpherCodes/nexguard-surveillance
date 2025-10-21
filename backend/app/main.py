@@ -8,6 +8,7 @@ from pathlib import Path
 
 from .core.database.connection import SessionLocal, create_tables
 from .services.camera_service import camera_service
+from .services.cleanup_service import cleanup_service
 from .Settings import settings
 from .data.seed import seed_default_settings, seed_default_zones, seed_default_user
 from .dependencies import get_video_capture , get_inference_engine
@@ -83,6 +84,10 @@ async def lifespan(app: FastAPI):
         # Start all enabled cameras
         video_capture.start_all_cameras()
         print("🎬 All enabled cameras started")
+        
+        # Start cleanup service
+        await cleanup_service.start()
+        print("🧹 Cleanup service started")
 
     except Exception as e:
         import traceback
@@ -96,6 +101,8 @@ async def lifespan(app: FastAPI):
     
     print("🛑 Shutting down NexGuard API...")
     video_capture.stop_all_cameras()
+    await cleanup_service.stop()
+    print("🧹 Cleanup service stopped")
 
 
 app = FastAPI(

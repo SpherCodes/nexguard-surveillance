@@ -13,7 +13,12 @@ from sqlalchemy.orm import Session
 from ...schema import (
     Camera, CameraCreate, CameraUpdate, CameraWithRelations
 )
-from ...dependencies import DatabaseDep, CameraServiceDep, VideoCaptureServiceDep
+from ...dependencies import (
+    DatabaseDep,
+    CameraServiceDep,
+    VideoCaptureServiceDep,
+    InferenceEngineDep,
+)
 from ...services.video_capture import CameraConfig
 
 router = APIRouter()
@@ -66,13 +71,13 @@ async def create_camera(
     camera_data: CameraCreate,
     db: DatabaseDep,
     camera_service: CameraServiceDep,
-    video_capture: VideoCaptureServiceDep
+    video_capture: VideoCaptureServiceDep,
+    inference_engine: InferenceEngineDep,
 ):
     """Create a new camera with validation"""
     try:
-        print(f"Creating camera: {camera_data}")
         camera = camera_service.create_camera(db, camera_data)
-        if camera.enabled:
+        if camera.enabled and video_capture:
             config = CameraConfig(
                 camera_id=camera.id,
                 url=camera.url,
@@ -81,9 +86,14 @@ async def create_camera(
                 enabled=camera.enabled,
                 location=camera.location,
             )
-            
-            if video_capture:
-                video_capture.add_camera(config)
+
+            added = video_capture.add_camera(config)
+            if not added:
+                video_capture.update_camera(config)
+
+            video_capture.start_camera(camera.id)
+            inference_engine.connect_video_capture(video_capture)
+            inference_engine.start_processing([camera.id], video_capture)
         return camera
     except ValueError as e:
         raise HTTPException(
@@ -103,7 +113,8 @@ async def update_camera(
     camera_data: CameraUpdate,
     db: DatabaseDep,
     camera_service: CameraServiceDep,
-    video_capture: VideoCaptureServiceDep
+    video_capture: VideoCaptureServiceDep,
+    inference_engine: InferenceEngineDep,
 ):
     """Update a camera with validation"""
     try:
@@ -119,25 +130,31 @@ async def update_camera(
             camera_data.fps_target is not None,
             camera_data.resolution_width is not None,
             camera_data.resolution_height is not None,
-            camera_data.enabled is not None
+            camera_data.enabled is not None,
         ]):
-            # Stop existing camera
-            video_capture.stop_camera(camera_id)
-            video_capture.remove_camera(camera_id)
-            
-            # Add updated camera if enabled
-            if updated_camera.enabled:
-                config = CameraConfig(
-                    camera_id=updated_camera.camera_id,
-                    url=updated_camera.url,
-                    fps_target=updated_camera.fps_target,
-                    resolution=(updated_camera.resolution_width, updated_camera.resolution_height),
-                    enabled=updated_camera.enabled,
-                    location=updated_camera.location
-                )
-                
-                video_capture.add_camera(config)
-                video_capture.start_camera(camera_id)
+            inference_engine.stop_processing([camera_id])
+
+            if video_capture:
+                video_capture.stop_camera(camera_id)
+                video_capture.remove_camera(camera_id)
+
+                if updated_camera.enabled:
+                    config = CameraConfig(
+                        camera_id=updated_camera.id,
+                        url=updated_camera.url,
+                        fps_target=updated_camera.fps_target,
+                        resolution=(updated_camera.resolution_width, updated_camera.resolution_height),
+                        enabled=updated_camera.enabled,
+                        location=updated_camera.location,
+                    )
+
+                    added = video_capture.add_camera(config)
+                    if not added:
+                        video_capture.update_camera(config)
+
+                    video_capture.start_camera(updated_camera.id)
+                    inference_engine.connect_video_capture(video_capture)
+                    inference_engine.start_processing([updated_camera.id], video_capture)
         
         return updated_camera
         
@@ -158,7 +175,8 @@ async def delete_camera(
     camera_id: int,
     db: DatabaseDep,
     camera_service: CameraServiceDep,
-    video_capture: VideoCaptureServiceDep
+    video_capture: VideoCaptureServiceDep,
+    inference_engine: InferenceEngineDep,
 ):
     """Delete a camera"""
     camera = camera_service.get_by_camera_id(db, camera_id)
@@ -169,6 +187,7 @@ async def delete_camera(
         )
     
     try:
+        inference_engine.stop_processing([camera_id])
         video_capture.remove_camera(camera_id)
         camera_service.delete(db, camera)
 
@@ -184,7 +203,8 @@ async def enable_camera(
     camera_id: int,
     db: DatabaseDep,
     camera_service: CameraServiceDep,
-    video_capture: VideoCaptureServiceDep
+    video_capture: VideoCaptureServiceDep,
+    inference_engine: InferenceEngineDep,
 ):
     """Enable a camera"""
     camera = camera_service.enable_camera(db, camera_id)
@@ -195,18 +215,22 @@ async def enable_camera(
         )
     
     try:
-        if not video_capture.is_camera_active(camera_id):
-            config = CameraConfig(
-                camera_id=camera.camera_id,
-                url=camera.url,
-                fps_target=camera.fps_target,
-                resolution=(camera.resolution_width, camera.resolution_height),
-                enabled=camera.enabled,
-                location=camera.location
-            )
-            video_capture.add_camera(config)
-        
-        video_capture.start_camera(camera_id)
+        config = CameraConfig(
+            camera_id=camera.id,
+            url=camera.url,
+            fps_target=camera.fps_target,
+            resolution=(camera.resolution_width, camera.resolution_height),
+            enabled=camera.enabled,
+            location=camera.location,
+        )
+
+        added = video_capture.add_camera(config)
+        if not added:
+            video_capture.update_camera(config)
+
+        video_capture.start_camera(camera.id)
+        inference_engine.connect_video_capture(video_capture)
+        inference_engine.start_processing([camera.id], video_capture)
         return camera
         
     except Exception as e:
@@ -221,7 +245,8 @@ async def disable_camera(
     camera_id: int,
     db: DatabaseDep,
     camera_service: CameraServiceDep,
-    video_capture: VideoCaptureServiceDep
+    video_capture: VideoCaptureServiceDep,
+    inference_engine: InferenceEngineDep,
 ):
     """Disable a camera"""
     camera = camera_service.disable_camera(db, camera_id)
@@ -232,8 +257,13 @@ async def disable_camera(
         )
     
     try:
-        # Stop video capture
+        inference_engine.stop_processing([camera_id])
         video_capture.stop_camera(camera_id)
+
+        existing_config = video_capture.cameras.get(camera_id)
+        if existing_config:
+            existing_config.enabled = False
+
         return camera
         
     except Exception as e:
@@ -261,7 +291,7 @@ async def get_camera_status(
     video_active = video_capture.is_camera_active(camera_id)
     
     return {
-        "camera_id": camera.camera_id,
+        "camera_id": camera.id,
         "name": camera.name,
         "enabled": camera.enabled,
         "video_active": video_active,
